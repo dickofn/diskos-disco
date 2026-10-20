@@ -342,17 +342,27 @@ const char *ui_route_mac(void){ return g_route_mac; }   /* device the player is 
 int ui_local_playback_allowed(void);
 void ui_resume_guard_arm(int reason, const char *mac);
 static void resume_guard_start(int reason, const char *mac, int force);
+void ui_resume_guard_cancel(void);
+int ui_get_source_mode(void);
 int bt_codec_upgrade_pending(void);                      /* bt.c: an AAC/LDAC switch is still to come for this route */
 /* Music held back while the codec switches (set by ui_route_bt, released by route_hold_tick or the user). */
 static uint32_t g_hold_since, g_hold_settle; static char g_hold_mac[20];
+static char g_hold_path[256]; static int g_hold_pos_id; static unsigned g_hold_path_seq, g_hold_gen;
 static void route_hold_start(const char *mac){
     g_hold_since = lv_tick_get() | 1; g_hold_settle = 0; snprintf(g_hold_mac, sizeof g_hold_mac, "%s", mac);
+    /* B03: the hold belongs to THIS song in THIS player session; anything else playing by the end is not ours */
+    track_state_t st; ipc_get_state(&st);
+    snprintf(g_hold_path, sizeof g_hold_path, "%s", st.path); g_hold_pos_id = st.pos_id;
+    g_hold_path_seq = st.path_seq; g_hold_gen = ipc_generation();
     fprintf(stderr, "route hold: waiting for the codec switch before playing\n"); fflush(stderr);
 }
 void ui_route_hold_cancel(void){ g_hold_since = 0; g_hold_settle = 0; }   /* the user pressed Play/Pause: their call */
 static void route_hold_tick(void){
     if(!g_hold_since) return;
     if(strcmp(g_hold_mac, g_route_mac)){ ui_route_hold_cancel(); return; } /* routed elsewhere meanwhile */
+    {   track_state_t st; ipc_get_state(&st);                             /* another song or session: not ours */
+        if(g_hold_gen != ipc_generation() || strcmp(g_hold_path, st.path) || g_hold_pos_id != st.pos_id
+           || g_hold_path_seq != st.path_seq){ ui_route_hold_cancel(); return; } }
     int pending = bt_codec_upgrade_pending();
     if(pending){
         if(lv_tick_elaps(g_hold_since) < 8000) return;
@@ -363,11 +373,22 @@ static void route_hold_tick(void){
         if(lv_tick_elaps(g_hold_settle) < 1500) return;
     }
     ui_route_hold_cancel();
+    if(g_playing){ fprintf(stderr, "route hold: already playing, nothing to do\n"); fflush(stderr); return; }   /* a toggle would PAUSE it */
     if(ipc_send_cmd("0201000C0000") == 0){ resume_guard_start(1, g_hold_mac, 1); fprintf(stderr, "route hold: playing\n"); fflush(stderr); }
+}
+/* The route is no longer valid (the headphones' link is gone, or the source changed): forget it with everything that
+ * hangs off it - the codec switch, the hold and the resume guard - so the next route to the same headphones is a
+ * full one (B01/B02). */
+void ui_route_forget(const char *why){
+    if(!g_route_mac[0]) return;
+    fprintf(stderr, "route BT %s forgotten (%s)\n", g_route_mac, why ? why : ""); fflush(stderr);
+    g_route_mac[0] = 0;
+    ui_bt_codec_upgrade_cancel(); ui_route_hold_cancel(); ui_resume_guard_cancel();
 }
 int ui_route_bt(const char *mac){
     if(modes_output_busy()) return -1;                  /* an output switch is in flight or recovering: the auto-route poll retries */
     if(!ui_local_playback_allowed()) return -1;
+    if(ui_get_source_mode() != 0) return -1;            /* B02: only while the source is Playback (not USB DAC, receiving...) */
     if(!mac) return -1;
     char norm[20]; route_uppercase(mac, norm, sizeof norm);
     if((int)strlen(norm) != 17) return -1;             /* must be AA:BB:CC:DD:EE:FF */
@@ -537,6 +558,7 @@ static int storage_player_guarded(void){
     return found > 0 && ok;
 }
 static int source_send(int mode){
+    { void bt_autoroute_reset(void); ui_route_forget("source change"); bt_autoroute_reset(); }   /* B02: the source owns the output now */
     if(ipc_send_cmd("0666000C0006") < 0) return -1;
     modes_output_reset();                                /* every source change starts from the internal DAC route */
     switch(mode){

@@ -141,7 +141,15 @@ int main(void){
  run(23400);assert(sends==0);run(23700);assert(sends==1 && !cancels);   /* switched: settle 1.5 s, then play */
  sends=0;now=30000;pending=1;route_hold_start(route);run(31000);ui_route_hold_cancel();pending=0;run(40000);assert(!sends);   /* user pressed Play/Pause */
  now=50000;pending=1;route_hold_start(route);strcpy(g_route_mac,"11:22:33:44:55:66");run(60000);assert(!sends);              /* routed elsewhere */
- puts("PASS BT route hold: waits for the codec switch, settles 1.5 s, plays once; SBC after 8 s; user and route changes win");
+ /* B03 (2.5.9 Bluetooth audit): the hold belongs to its song and session, and never toggles a playing song */
+ strcpy(g_route_mac,"AA:BB:CC:DD:EE:FF");
+ sends=0;now=70000;pending=1;route_hold_start(route);run(71000);
+ strcpy(current.path,"/music/b.flac");current.path_seq++;pending=0;run(80000);assert(!sends);   /* another song chosen */
+ strcpy(current.path,"/music/a.flac");
+ sends=0;now=90000;pending=1;route_hold_start(route);run(91000);gen++;pending=0;run(99000);assert(!sends);   /* player restarted */
+ sends=0;now=100000;pending=1;route_hold_start(route);run(101000);g_playing=1;pending=0;run(109000);assert(!sends);   /* already playing */
+ g_playing=0;
+ puts("PASS BT route hold: waits for the codec switch, settles 1.5 s, plays once; SBC after 8 s; user and route changes win; another song, another session or music already playing: no toggle");
  return 0;
 }
 """

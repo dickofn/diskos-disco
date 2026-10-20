@@ -483,6 +483,9 @@ static int transport_now(const char *cmd)
         ui_toast("Return to local playback first"); return -1;
     }
     ui_defer_sleep();
+    /* B03: any on-screen transport is the user's call: cancel the Bluetooth codec hold and the resume guard BEFORE
+     * the queue or a book can take the press (those paths return early, and used to skip this) */
+    { void ui_resume_guard_cancel(void); void ui_route_hold_cancel(void); ui_resume_guard_cancel(); ui_route_hold_cancel(); }
     if(is_next || is_prev){
         track_state_t st; ipc_get_state(&st);
         if(mdb_is_book_path(st.path)){
