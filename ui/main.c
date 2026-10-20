@@ -415,16 +415,29 @@ int ui_route_bt(const char *mac){
     int was_playing = g_playing;   /* real play state; raw st.state is unreliable (reports 0 while playing) so
                                     * the old `st.state==1` was false during playback -> pause was SKIPPED */
     if(was_playing && ipc_send_cmd("0201000C0000") < 0) return -1;   /* pause; abort route if it can't be sent (don't switch output unpaused) */
-    if(ipc_send_cmd("0666000C0006") < 0) return -1;     /* stock pre-stop: normalize local output state */
-    ipc_send_cmd("0642000C0000");                       /* reset network/output mode */
-    ipc_send_cmd("0657000C0008");                       /* work-mode 8 (required orchestration, not our work_mode) */
-    ipc_send_cmd("06c1000C0000");                       /* initialize the player's BT subsystem */
-    if(ipc_send_cmd("0666000C0002") < 0) return -1;     /* out_dev = BT source */
-    modes_output_reset();                               /* no longer on SPDIF / USB audio */
-    ipc_send_cmd("0657000C0008");
+    /* N02 (Bluetooth findings, 21 Oct): every step is required. A rejected one ends the route: nothing is recorded as
+     * routed (the auto-route poll tries again later), the log names the step, and if the music was paused for the
+     * switch the user is told, since no blind play/pause toggle is sent to undo it. */
     char f[48];
     if(ui_bt_codec_frame(norm, f, sizeof f) < 0) return -1;   /* 06b3 with SBC (VALUE1 0) + MAC payload, as always */
-    if(ipc_send_cmd(f) < 0) return -1;
+    const char *const steps[] = {
+        "0666000C0006",                                 /* stock pre-stop: normalize local output state */
+        "0642000C0000",                                 /* reset network/output mode */
+        "0657000C0008",                                 /* work-mode 8 (required orchestration, not our work_mode) */
+        "06c1000C0000",                                 /* initialize the player's BT subsystem */
+        "0666000C0002",                                 /* out_dev = BT source */
+        "0657000C0008",
+        f,                                              /* the route's SBC codec frame for this device */
+    };
+    for(unsigned i = 0; i < sizeof steps / sizeof *steps; i++){
+        if(ipc_send_cmd(steps[i]) < 0){
+            fprintf(stderr, "route BT %s incomplete: step %u (%.12s) rejected%s\n", norm, i + 1, steps[i],
+                    was_playing ? "; music was paused for it" : ""); fflush(stderr);
+            if(was_playing) ui_toast("Bluetooth didn't start - press Play to resume");
+            return -1;
+        }
+        if(i == 4) modes_output_reset();                /* no longer on SPDIF / USB audio */
+    }
     if(st.volume_seq){ char v[16]; snprintf(v, sizeof v, "0715000C%04X", st.volume); ipc_send_cmd(v); }
     /* Safe minimal resume; deterministic load/play remains a future improvement. */
     if(st.have_track && st.position_ms > 0) ui_seek_to(st.position_ms);  /* resume position, not restart */

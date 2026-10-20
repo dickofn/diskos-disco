@@ -42,6 +42,7 @@ int  ipc_send_probe(const char *frame);/* background send (state-sync/health): s
 int  ipc_send_quiet(const char *frame);/* background command that retries itself: waits in line, never toasts */
 void ipc_tx_pump(void);                /* main loop: deliver frames waiting for a busy player (in order) */
 int  ipc_tx_waiting(void);             /* frames still waiting for the player */
+int  ipc_drop_queued(const char *prefix);   /* withdraw waiting frames with this prefix (cancelled operations) */
 int  ipc_is_ready(void);               /* 1 once the /ui receive queue is open */
 void ipc_quiet_begin(void);           /* sends until ipc_quiet_end() are silent (no toast) */
 int  ipc_quiet_end(void);             /* ends it; returns how many sends failed inside */

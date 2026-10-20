@@ -65,6 +65,14 @@ static void bt_autoroute_start(void);      /* fwd */
 static void bt_autoroute_stop(void);       /* fwd */
 static void bt_remember_last(const char *mac);   /* fwd */
 static void bt_reap_bounded(pid_t pid);          /* fwd */
+static pid_t g_conn_pid;                          /* the running pair/connect attempt, 0 = none */
+static char g_disc_mac[20]; static uint32_t g_disc_until;   /* N03: just disconnected: don't auto-route back to it */
+static void conn_proc_stop(void){
+    if(g_conn_pid > 0){
+        if(waitpid(g_conn_pid, NULL, WNOHANG) == 0){ kill(-g_conn_pid, SIGTERM); kill(g_conn_pid, SIGTERM); bt_reap_bounded(g_conn_pid); }
+        g_conn_pid = 0;
+    }
+}
 static pid_t g_scan_pid;                          /* the running device search (bluetoothctl scan), 0 = none */
 static void scan_proc_stop(void){                 /* end our device search: its BlueZ session goes with it */
     if(g_scan_pid > 0){
@@ -500,6 +508,9 @@ void ui_bt_codec_upgrade_cancel(void){
     pthread_mutex_lock(&g_cq_mu);
     g_cq.gen++; g_cq.armed = 0; g_cq.applied = 0; g_cq.state = 0;
     pthread_mutex_unlock(&g_cq_mu);
+    /* N01: an AAC/LDAC request still in line goes too - only those (VALUE1 1-4), never the route's own SBC frame
+     * (VALUE1 0), which the auto-route poll's routine cancels right after a route must not withdraw */
+    for(int v = 1; v <= 4; v++){ char pre[16]; snprintf(pre, sizeof pre, "06b3%04X%04X", 12u + 17u, (unsigned)v); ipc_drop_queued(pre); }
 }
 /* Called after a route to `mac`. fresh = a full route sequence just re-sent the SBC frame: it cancels whatever was
  * pending and, if AAC/LDAC is chosen, arms a new upgrade. fresh = 0 (already routed there, e.g. a tap) keeps a
@@ -638,6 +649,7 @@ static void bt_autoroute_poll_cb(lv_timer_t *t){
         return;
     }
     missing = 0;
+    if(g_disc_mac[0] && !strcmp(mac, g_disc_mac) && (int32_t)(lv_tick_get() - g_disc_until) < 0) return;   /* N03 */
     if(strcmp(mac, g_bt_autorouted)){
         if(ui_route_bt(mac) == 0){    /* latch only on a successful route, else retry on the next poll */
             snprintf(g_bt_autorouted, sizeof g_bt_autorouted, "%s", mac);
@@ -780,10 +792,21 @@ static void bt_connect(const char *mac){
     /* Stop discovery first (pairing/connecting during an inquiry fails often on this chip), and pair only a device
      * that isn't paired yet (re-pairing confuses some headphones). */
     snprintf(cmd, sizeof cmd,
-             "( bluetoothctl scan off; bluetoothctl info %s 2>/dev/null | grep -q 'Paired: yes' || bluetoothctl pair %s; "
-             "bluetoothctl trust %s; bluetoothctl connect %s ) >/dev/null 2>&1 &",
+             "bluetoothctl scan off; bluetoothctl info %s 2>/dev/null | grep -q 'Paired: yes' || bluetoothctl pair %s; "
+             "bluetoothctl trust %s; bluetoothctl connect %s",
              mac, mac, mac, mac);
-    system(cmd);
+    conn_proc_stop();                                   /* a previous attempt still running: this one replaces it */
+    {   /* our own child in its own process group, so Disconnect can stop it (N03) */
+        posix_spawn_file_actions_t fa; posix_spawn_file_actions_init(&fa);
+        posix_spawn_file_actions_addopen(&fa, 1, "/dev/null", O_WRONLY, 0);
+        posix_spawn_file_actions_addopen(&fa, 2, "/dev/null", O_WRONLY, 0);
+        posix_spawnattr_t at; posix_spawnattr_init(&at);
+        posix_spawnattr_setflags(&at, POSIX_SPAWN_SETPGROUP); posix_spawnattr_setpgroup(&at, 0);
+        char *argv[] = { "sh", "-c", cmd, NULL }; extern char **environ; pid_t pid;
+        if(posix_spawn(&pid, "/bin/sh", &fa, &at, argv, environ) == 0) g_conn_pid = pid;
+        posix_spawn_file_actions_destroy(&fa); posix_spawnattr_destroy(&at);
+    }
+    if(!strcmp(g_disc_mac, mac)) g_disc_mac[0] = 0;   /* connecting again lifts an earlier Disconnect's block */
     snprintf(g_bt_conn_mac, sizeof g_bt_conn_mac, "%s", mac);
     ui_toast("Connecting...");
     g_bt_conn_start = lv_tick_get();
@@ -792,6 +815,15 @@ static void bt_connect(const char *mac){
 }
 static void bt_disconnect(const char *mac){
     if(!bt_mac_valid(mac)) return;
+    /* N03: a Disconnect supersedes the connection attempt at every layer: its watcher, its cached "connected" result,
+     * its pair/connect process; and for a few seconds the auto-route won't route to these headphones while their link
+     * is still going down. */
+    if(!strcmp(mac, g_bt_conn_mac)){
+        if(g_bt_conn_timer){ lv_timer_del(g_bt_conn_timer); g_bt_conn_timer = NULL; }
+        g_bt_conn_mac[0] = 0; conn_proc_stop();
+        pthread_mutex_lock(&g_cc_mu); g_cc_mac[0] = 0; g_cc_yes = 0; pthread_mutex_unlock(&g_cc_mu);
+    }
+    snprintf(g_disc_mac, sizeof g_disc_mac, "%s", mac); g_disc_until = lv_tick_get() + 8000;
     if(!strcmp(mac, g_bt_autorouted)) g_bt_autorouted[0] = 0;
     ui_route_analog();          /* return audio to the DAC before dropping the A2DP link */
     char cmd[128];
@@ -888,25 +920,40 @@ void bt_codec_apply_async(const char *mac){
  * background probe so the UI thread never waits on bluetoothctl. Cached; re-probed at most every 4 s. */
 static pthread_mutex_t g_pr_mu = PTHREAD_MUTEX_INITIALIZER;
 static char g_pr_name[64]; static int g_pr_conn = 0, g_pr_running = 0; static uint32_t g_pr_at = 0, g_pr_have = 0;
+/* N04 (Bluetooth findings, 21 Oct): this BlueZ (5.54) can't list only connected devices, so each pass asks about at
+ * most 8 of the known ones - first the one found connected last time, then 8 more starting where the previous pass
+ * stopped - so a connected device anywhere in a long list is found within a few passes. */
+static int g_pr_offset; static char g_pr_last[18];          /* [g_pr_mu] */
 static void *peer_worker(void *a){
     (void)a; char buf[4096], name[64] = {0}; int conn = 0;
     if(run_cap_to("bluetoothctl devices 2>/dev/null", buf, sizeof buf, 2500) > 0){
-        char *l = buf; int tried = 0;
-        while(l && *l && !conn && tried < 8){
+        char macs[64][18], names[64][64]; int n = 0;
+        for(char *l = buf; l && *l && n < 64; ){
             char *nl = strchr(l, '\n'); if(nl) *nl = 0;
             if(!strncmp(l, "Device ", 7) && strlen(l) > 7 + 17){
                 char mac[20]; memcpy(mac, l + 7, 17); mac[17] = 0;
-                if(bt_mac_valid(mac)){
-                    char cmd[128], info[2048], cv[16]; tried++;
-                    snprintf(cmd, sizeof cmd, "bluetoothctl info %s 2>/dev/null", mac);
-                    if(run_cap_to(cmd, info, sizeof info, 1500) < 0) break;
-                    if(bt_info_prop(info, "Connected:", cv, sizeof cv) && !strcmp(cv, "yes")){
-                        conn = 1; snprintf(name, sizeof name, "%s", l + 7 + 17 + 1);
-                    }
-                }
+                if(bt_mac_valid(mac)){ snprintf(macs[n], 18, "%s", mac); snprintf(names[n], 64, "%s", l + 7 + 17 + 1); n++; }
             }
             if(!nl) break; l = nl + 1;
         }
+        pthread_mutex_lock(&g_pr_mu); int off = n ? g_pr_offset % n : 0; char last[18]; snprintf(last, sizeof last, "%s", g_pr_last); pthread_mutex_unlock(&g_pr_mu);
+        int order[9], m = 0;
+        for(int i = 0; i < n; i++) if(last[0] && !strcmp(macs[i], last)){ order[m++] = i; break; }
+        for(int k = 0; k < n && m < 9; k++){ int i = (off + k) % n; if(m && i == order[0]) continue; order[m++] = i; }
+        int asked = 0;
+        for(int j = 0; j < m && !conn; j++){
+            char cmd[128], info[2048], cv[16];
+            snprintf(cmd, sizeof cmd, "bluetoothctl info %s 2>/dev/null", macs[order[j]]);
+            if(run_cap_to(cmd, info, sizeof info, 1500) < 0) break;
+            asked++;
+            if(bt_info_prop(info, "Connected:", cv, sizeof cv) && !strcmp(cv, "yes")){
+                conn = 1; snprintf(name, sizeof name, "%s", names[order[j]]);
+                pthread_mutex_lock(&g_pr_mu); snprintf(g_pr_last, sizeof g_pr_last, "%s", macs[order[j]]); pthread_mutex_unlock(&g_pr_mu);
+            }
+        }
+        pthread_mutex_lock(&g_pr_mu);
+        if(!conn && n) g_pr_offset = (off + (asked > 8 ? 8 : asked)) % n;   /* next pass continues after these */
+        pthread_mutex_unlock(&g_pr_mu);
     }
     pthread_mutex_lock(&g_pr_mu);
     g_pr_conn = conn; snprintf(g_pr_name, sizeof g_pr_name, "%s", name); g_pr_have = 1; g_pr_running = 0;
