@@ -3,6 +3,9 @@
 > **Recommended: start from FiiO's stock V2.57 firmware.** Installing over upstream diskOS or another diskOS build is not supported and can be buggy; restore stock first.
 
 > Switched to Disco from upstream diskOS or another build, and something looks or behaves wrong? **Settings > System > Maintenance > Reset diskOS Settings** gives the interface a fresh start; your music, Wi-Fi, Bluetooth, EQ and audio settings stay. Going back to stock in between does *not* clear what diskOS leaves on the Disc.
+>
+> **Starts stock after installing?** An earlier "Default UI: Stock" choice survives flashing. Hold **Volume Up** while
+> powering on to start Disco once, then set Settings > System > Controls > Default UI to **diskOS**.
 
 Use a Mac, a USB data cable and your own unmodified **FiiO V2.57 firmware ZIP**. Back up your music and keep the installer's saved stock image on separate storage. Allow about 30 uninterrupted minutes.
 

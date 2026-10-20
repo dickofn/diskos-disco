@@ -16,6 +16,9 @@
 > your own. Without internet, the app uses what it already has.
 
 > Switched to Disco from upstream diskOS or another build, and something looks or behaves wrong? **Settings > System > Maintenance > Reset diskOS Settings** gives the interface a fresh start; your music, Wi-Fi, Bluetooth, EQ and audio settings stay. Going back to stock in between does *not* clear what diskOS leaves on the Disc.
+>
+> **Starts stock after installing?** An earlier "Default UI: Stock" choice survives flashing. Hold **Volume Up** while
+> powering on to start Disco once, then set Settings > System > Controls > Default UI to **diskOS**.
 
 **Install diskOS Disco! on your Snowsky Disc from a Windows PC, by clicking through four pages.** No terminal, no
 Linux knowledge, no typing commands. The app checks your PC, sets everything up, flashes the Disc, and later puts new

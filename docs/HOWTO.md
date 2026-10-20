@@ -238,6 +238,11 @@ stock one. Restart the Disc to return. Your music and settings are safe.
 
 **Sleep timer.** Settings > System > Power > Sleep Timer; When Sleep Ends chooses pause or shut down.
 
+**The Disc starts stock even after installing Disco.** An earlier "Default UI: Stock" choice survives flashing and
+firmware updates (it's kept in the Disc's data area). Hold **Volume Up** while powering on to start Disco once, then
+set Settings > System > Controls > Default UI to **diskOS**. Holding Volume Up at power-on always starts the other
+interface for one boot.
+
 **Things look or behave wrong after switching from upstream diskOS.** Settings > System > Maintenance > Reset
 diskOS Settings gives the interface a fresh start; music, Wi-Fi, Bluetooth, EQ and audio settings stay. (Going back to
 stock in between doesn't clear what diskOS leaves on the Disc.)
