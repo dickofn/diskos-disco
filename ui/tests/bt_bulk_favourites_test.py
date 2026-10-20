@@ -45,8 +45,9 @@ static void stall(void){now+=100;resume_guard_tick(0);now+=3600;resume_guard_tic
 int main(void){
  ui_resume_guard_arm(2,route);stall();stall();
  assert(sends==0 && failed==0 && notices==1);          /* codec switch: a hint only, once */
- notices=0;now=10000;ui_resume_guard_arm(1,route);stall();assert(sends==1 && !notices);   /* route: play once */
- stall();assert(sends==1 && notices==1 && failed==0);  /* still stopped: a hint, never a second press */
+ /* P01 (delayed-pause report): after a route too, a stalled position is only a hint - a toggle could PAUSE music that
+  * is still playing with late position reports */
+ notices=0;now=10000;ui_resume_guard_arm(1,route);stall();assert(sends==0 && notices==1 && failed==0);
  sends=0;
  notices=0;now=20000;ui_resume_guard_arm(1,route);route[0]=0;stall();assert(!notices && !sends);
  strcpy(route,"AA:BB:CC:DD:EE:FF");now=40000;ui_resume_guard_arm(2,route);gen++;stall();assert(!notices);
@@ -57,7 +58,7 @@ int main(void){
  current.position_ms=10000;now=140000;ui_resume_guard_arm(2,route);ui_resume_guard_cancel();stall();assert(!notices);
  now=160000;ui_resume_guard_arm(2,route);now+=11000;resume_guard_tick(0);assert(!notices);
  now=180000;ui_resume_guard_arm(2,route);resume_guard_tick(0);now+=2000;resume_guard_tick(1);now+=2000;resume_guard_tick(0);assert(!notices);
- puts("PASS BT: codec switch only hints; route plays once then hints; never a codec failure; stale route/generation/track, EOF, cancel, expiry and transient stall suppressed");
+ puts("PASS BT: after a codec switch or a route a stalled position only hints, never a toggle; never a codec failure; stale route/generation/track, EOF, cancel, expiry and transient stall suppressed");
 }
 '''
 db = (ui/'musicdb.c').read_text()
@@ -112,7 +113,7 @@ with tempfile.TemporaryDirectory(prefix='disco-bt-fav-') as tmp:
         subprocess.run([str(binary)],check=True,timeout=10)
 
 # ---- 2.5.8: route hold (music waits for the AAC/LDAC switch, then plays once on the final codec) ----
-hold = main[main.index('static uint32_t g_hold_since'):main.index('int ui_route_bt(const char *mac){')]
+hold = main[main.index('static uint32_t g_hold_since'):main.index('int ui_route_analog(void){')]   # incl. ui_route_bt
 h = r"""
 #include <assert.h>
 #include <stdint.h>
@@ -120,7 +121,7 @@ h = r"""
 #include <string.h>
 #include "ipc.h"
 static uint32_t now=100;static unsigned gen=1;
-static int g_playing=0,g_play_pending,sends,notices,pending,cancels;
+static int g_playing=0,sends,notices,pending,cancels; static uint32_t g_play_pending;
 static char route[20]="AA:BB:CC:DD:EE:FF", g_route_mac[20]="AA:BB:CC:DD:EE:FF";
 static track_state_t current={.have_track=1,.path="/music/a.flac",.pos_id=1,.path_seq=1,.position_ms=0,.duration_ms=100000};
 static uint32_t lv_tick_get(void){return now;}
@@ -132,6 +133,17 @@ int ipc_send_cmd(const char *s){(void)s;sends++;return 0;}
 static void ui_toast(const char *s){(void)s;notices++;}
 int bt_codec_upgrade_pending(void){return pending;}
 void ui_bt_codec_upgrade_cancel(void){pending=0;cancels++;}
+static int arms;
+static int modes_output_busy(void){return 0;}
+int ui_local_playback_allowed(void){return 1;}
+int ui_get_source_mode(void){return 0;}
+static int ui_player_settling(void){return 0;}
+static void modes_output_reset(void){}
+int ui_bt_codec_frame(const char *m,char *o,int c){snprintf(o,c,"06b3%s",m);return 0;}
+static int ui_seek_to(long ms){(void)ms;return 0;}
+void ui_bt_codec_upgrade_arm(const char *m,int fresh){(void)m;if(fresh){arms++;pending=1;}}
+static void route_uppercase(const char *in,char *out,int cap){int j=0;for(int i=0;in[i]&&j<cap-1;i++){char c=in[i];if(c>='a'&&c<='z')c-=32;out[j++]=c;}out[j]=0;}
+static const char *norm_mac_for_defer(const char *mac){static char n[20];route_uppercase(mac,n,sizeof n);return n;}
 """ + guard + hold + r"""
 static void run(uint32_t until){while(now<until){now+=100;route_hold_tick();}}
 int main(void){
@@ -141,7 +153,21 @@ int main(void){
  run(23400);assert(sends==0);run(23700);assert(sends==1 && !cancels);   /* switched: settle 1.5 s, then play */
  sends=0;now=30000;pending=1;route_hold_start(route);run(31000);ui_route_hold_cancel();pending=0;run(40000);assert(!sends);   /* user pressed Play/Pause */
  now=50000;pending=1;route_hold_start(route);strcpy(g_route_mac,"11:22:33:44:55:66");run(60000);assert(!sends);              /* routed elsewhere */
- puts("PASS BT route hold: waits for the codec switch, settles 1.5 s, plays once; SBC after 8 s; user and route changes win");
+ /* B03 (2.5.9 Bluetooth audit): the hold belongs to its song and session, and never toggles a playing song */
+ strcpy(g_route_mac,"AA:BB:CC:DD:EE:FF");
+ sends=0;now=70000;pending=1;route_hold_start(route);run(71000);
+ strcpy(current.path,"/music/b.flac");current.path_seq++;pending=0;run(80000);assert(!sends);   /* another song chosen */
+ strcpy(current.path,"/music/a.flac");
+ sends=0;now=90000;pending=1;route_hold_start(route);run(91000);gen++;pending=0;run(99000);assert(!sends);   /* player restarted */
+ sends=0;now=100000;pending=1;route_hold_start(route);run(101000);g_playing=1;pending=0;run(109000);assert(!sends);   /* already playing */
+ g_playing=0;
+ /* P02 (delayed-pause report): no route while a song is still starting - its codec switch would land mid-song, unheld */
+ g_route_mac[0]=0;pending=0;arms=0;sends=0;now=200000;g_playing=0;g_play_pending=now;
+ assert(ui_route_bt("11:22:33:44:55:66")==-2 && sends==0 && arms==0 && !g_hold_since);   /* deferred: nothing sent */
+ g_play_pending=0;g_playing=1;now=210000;
+ assert(ui_route_bt("11:22:33:44:55:66")==0 && arms==1 && g_hold_since);   /* the song plays: routed, held for the codec */
+ int before=sends;ui_route_hold_cancel();g_playing=0;(void)before;
+ puts("PASS BT route hold: waits for the codec switch, settles 1.5 s, plays once; SBC after 8 s; user and route changes win; another song, another session or music already playing: no toggle; no route while a song is starting");
  return 0;
 }
 """

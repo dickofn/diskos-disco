@@ -35,6 +35,7 @@
 #include <string.h>
 #include <math.h>
 #include <pthread.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 #include <ctype.h>
 
@@ -431,7 +432,40 @@ void ui_perf_note(const char *stage){
     fprintf(stderr, "perf: %s at=%u since-tap=%ums\n", stage, art_clock_ms(),
             start ? art_clock_ms() - start : 0);
 }
+/* Skip pacing. Every Next/Previous makes FiiO's player rebuild playback and write its database, and makes Disco
+ * start covers, lyrics, history and the queue check for the new song. A fast burst of skips piled all of that up,
+ * and that is when the interface (or the player) went down. So on-screen skips go to the player at most once every
+ * SKIP_GAP_MS: extra presses in between are counted (Next +1, Previous -1, so they cancel) and sent one by one at
+ * that pace. Nothing is dropped: you land where you would have landed, just paced. Hardware keys go straight to the
+ * player and aren't affected. */
+#define SKIP_GAP_MS 300
+#define SKIP_PENDING_MAX 8
+static int transport_now(const char *cmd);
+static uint32_t g_skip_last; static int g_skip_pending; static lv_timer_t *g_skip_timer;
+static void skip_pace_cb(lv_timer_t *t){
+    (void)t;
+    if(g_skip_pending == 0){ lv_timer_delete(g_skip_timer); g_skip_timer = NULL; return; }
+    int dir = g_skip_pending > 0 ? 1 : -1;
+    g_skip_pending -= dir;
+    g_skip_last = lv_tick_get();
+    if(transport_now(dir > 0 ? "0201000C0001" : "0201000C0002") < 0) g_skip_pending = 0;   /* refused: drop the rest */
+}
 int ui_transport_command(const char *cmd)
+{
+    if(!cmd) return -1;
+    int skip = !strcmp(cmd, "0201000C0001") ? 1 : !strcmp(cmd, "0201000C0002") ? -1 : 0;
+    if(skip && !ma_controls() && (g_skip_pending != 0 || (g_skip_last && lv_tick_elaps(g_skip_last) < SKIP_GAP_MS))){
+        g_skip_pending += skip;
+        if(g_skip_pending > SKIP_PENDING_MAX) g_skip_pending = SKIP_PENDING_MAX;
+        if(g_skip_pending < -SKIP_PENDING_MAX) g_skip_pending = -SKIP_PENDING_MAX;
+        if(!g_skip_timer) g_skip_timer = lv_timer_create(skip_pace_cb, SKIP_GAP_MS, NULL);
+        return 0;                                                   /* counted: it will be sent in turn */
+    }
+    if(skip) g_skip_last = lv_tick_get() | 1;
+    else if(!strcmp(cmd, "0201000C0000")) g_skip_pending = 0;       /* Play/Pause: stop any skips still waiting */
+    return transport_now(cmd);
+}
+static int transport_now(const char *cmd)
 {
     if(!cmd) return -1;
     int is_next = !strcmp(cmd, "0201000C0001");
@@ -449,6 +483,9 @@ int ui_transport_command(const char *cmd)
         ui_toast("Return to local playback first"); return -1;
     }
     ui_defer_sleep();
+    /* B03: any on-screen transport is the user's call: cancel the Bluetooth codec hold and the resume guard BEFORE
+     * the queue or a book can take the press (those paths return early, and used to skip this) */
+    { void ui_resume_guard_cancel(void); void ui_route_hold_cancel(void); ui_resume_guard_cancel(); ui_route_hold_cancel(); }
     if(is_next || is_prev){
         track_state_t st; ipc_get_state(&st);
         if(mdb_is_book_path(st.path)){
@@ -2211,6 +2248,7 @@ static void apply_art(const art_req_t *job)
 
 static void *art_worker(void *arg)
 {
+    prctl(PR_SET_NAME, (unsigned long)"covers", 0, 0, 0);   /* named in the crash log */
     (void)arg;
     for(;;){
         art_req_t job; unsigned my_req, my_gen;
@@ -2502,6 +2540,12 @@ static void make_art_key(const track_state_t *st, char *out, int cap)
 }
 
 /* main thread: decide whether art needs (re)decoding and dispatch to the worker */
+#define COVER_SETTLE_MS 300
+static art_req_t g_settle_job; static unsigned g_settle_due; static int g_settle_have;
+static void art_post_job(const art_req_t *jp);
+static void art_settle_tick(void){                     /* the cover timer: post a waiting job once it has settled */
+    if(g_settle_have && (int)(art_clock_ms() - g_settle_due) >= 0){   /* wrap-safe */ g_settle_have = 0; art_post_job(&g_settle_job); }
+}
 static void update_cover_for_path(const track_state_t *st)
 {
     if(strcmp(last_path, st->path) == 0) return;
@@ -2527,7 +2571,7 @@ static void update_cover_for_path(const track_state_t *st)
 
     copy_cstr(last_path, sizeof(last_path), st->path);
 
-    if(!st->path[0]) { art_request_clear(); return; }
+    if(!st->path[0]) { g_settle_have = 0; art_request_clear(); return; }
 
     /* New album/art incoming: hide the now-wrong NP cover and show a loading glyph
      * while the worker decodes, so the previous album's art doesn't masquerade as
@@ -2556,6 +2600,14 @@ static void update_cover_for_path(const track_state_t *st)
     snprintf(job.bout, sizeof job.bout, "/tmp/backdrop%d.bmp", nidx);
     snprintf(job.sharp, sizeof job.sharp, "/tmp/sharp%d.bgra", nidx);
 
+    /* Settle: the song must stay current for COVER_SETTLE_MS before its cover is decoded. During a burst of skips
+     * the songs you fly past start no decode at all (the loading symbol shows at once, as before); a newer song
+     * simply replaces the waiting job. */
+    g_settle_job = job; g_settle_due = art_clock_ms() + COVER_SETTLE_MS; g_settle_have = 1;
+}
+static void art_post_job(const art_req_t *jp)
+{
+    art_req_t job = *jp;
     int launch = 0;
     pthread_mutex_lock(&g_art_mu);
     art_pixels_free(g_art_result.pixels); g_art_result.pixels = NULL; g_art_ready = 0;
@@ -2585,6 +2637,7 @@ static void update_cover_for_path(const track_state_t *st)
 void ui_art_poll(lv_timer_t *t)
 {
     (void)t;
+    art_settle_tick();
     { char got[512];                        /* Online Album Art saved a picture: redo that song's cover if it's on */
       if(netart_take_ready(got, sizeof got) && simple_cfg_get_int("online_art", 0) && strcmp(got, last_path) == 0) ui_art_retry(); }
     int ready = 0, rc = -1, inflight; art_req_t res; unsigned done_req = 0, cur_req = 0;
@@ -2718,6 +2771,7 @@ static int pw_decode(const char *path, const char *cover, const char *thumb,
  * browse - but yields to the live decode and to heat. DB access is safe: g_db is opened FULLMUTEX. */
 static void *art_prewarm_worker(void *arg)
 {
+    prctl(PR_SET_NAME, (unsigned long)"covers-ahead", 0, 0, 0);   /* named in the crash log */
     (void)arg;
     nice(15);                 /* lowest CPU priority */
     const char *PC="/tmp/pw_cover.bmp", *PT="/tmp/pw_thumb.bmp", *PB="/tmp/pw_backdrop.bmp";
@@ -3376,7 +3430,11 @@ void ui_history_tick(const track_state_t *st)
     /* count a play once per new track (diskOS play history -> Most-Played / Recently-Played), but
      * only while actually PLAYING (st->state==2). Otherwise a boot-seeded paused track, or skipping
      * through tracks while paused, would inflate play counts + recency for songs never really played. */
-    if(st->state==2 && st->path[0] && strcmp(g_stat_path, st->path) != 0){
+    /* only once a song has really been playing for a moment: songs flown past in a burst of skips aren't written
+     * to the play history (one fewer database write competing with the player's own per skip) */
+    static char seen[256]; static uint32_t seen_at;
+    if(strcmp(seen, st->path)){ copy_cstr(seen, sizeof seen, st->path); seen_at = lv_tick_get(); }
+    if(st->state==2 && st->path[0] && strcmp(g_stat_path, st->path) != 0 && lv_tick_elaps(seen_at) >= 1000){
         copy_cstr(g_stat_path, sizeof g_stat_path, st->path);          /* track identity always (so a music replay after a book still counts) */
         if(!mdb_is_book_path(st->path)) mdb_record_play(st->path);     /* but audiobooks are excluded from play history */
     }

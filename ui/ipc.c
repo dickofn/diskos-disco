@@ -504,7 +504,15 @@ static long tx_depth(void){
  * "not yet", not "gone": such a frame waits too, for up to 30 s while the player has never answered this session. */
 static int tx_not_yet(int err){ return err == ENOENT; }
 static uint32_t tx_hold(void){ return ipc_rx_frames() ? TX_HOLD_MS : TX_HOLD_BOOT_MS; }
-typedef struct { char f[448]; uint32_t t0; int quiet; } txe_t;   /* a play frame is up to ~420 */
+typedef struct { char f[448]; uint32_t t0; int quiet; unsigned gen; } txe_t;   /* a play frame is up to ~420 */
+/* N01 (Bluetooth findings, 21 Oct): a frame that only makes sense in the player session it was made for - play/pause,
+ * the output route and work mode, Bluetooth init and codec - is dropped instead of delivered when the player has
+ * restarted while it waited. Settings (volume, EQ...) still go out: they are wanted in any session. */
+static int tx_session_bound(const char *f){
+    static const char *const p[] = { "0201", "0666", "0657", "0642", "06c1", "06b3", NULL };
+    for(int i = 0; p[i]; i++) if(!strncmp(f, p[i], 4)) return 1;
+    return 0;
+}
 static txe_t g_txq[TX_MAX];
 static int g_txh, g_txn;
 static pthread_mutex_t g_txmu = PTHREAD_MUTEX_INITIALIZER;
@@ -516,6 +524,10 @@ static void tx_fail(const txe_t *e, int err){
 static void tx_drain_locked(void){
     while(g_txn > 0){
         txe_t *e = &g_txq[g_txh]; int err = 0;
+        if(e->gen != g_generation && tx_session_bound(e->f)){           /* made for a player session that is gone */
+            fprintf(stderr, "ipc: dropped '%.12s' from an earlier player session\n", e->f);
+            g_txh = (g_txh + 1) % TX_MAX; g_txn--; continue;
+        }
         int r = tx_try(e->f, &err);
         if(r == 1 || (r < 0 && tx_not_yet(err))){                         /* still full, or no player yet */
             if(tx_ms() - e->t0 < tx_hold()) return;
@@ -541,7 +553,7 @@ static int ipc_send_internal(const char*frame, int quiet){
     if(g_txn >= TX_MAX){ txe_t e; snprintf(e.f, sizeof e.f, "%s", frame); e.quiet = quiet; tx_fail(&e, EAGAIN); rc = -1; }
     else {
         txe_t *e = &g_txq[(g_txh + g_txn) % TX_MAX];
-        snprintf(e->f, sizeof e->f, "%s", frame); e->t0 = tx_ms(); e->quiet = quiet; g_txn++;
+        snprintf(e->f, sizeof e->f, "%s", frame); e->t0 = tx_ms(); e->quiet = quiet; e->gen = g_generation; g_txn++;
         fprintf(stderr,"ipc: player busy, '%.12s' waits (%d in line)\n", frame, g_txn);
     }
     pthread_mutex_unlock(&g_txmu);
@@ -553,6 +565,23 @@ void ipc_tx_pump(void){
     pthread_mutex_lock(&g_txmu); tx_drain_locked(); pthread_mutex_unlock(&g_txmu);
 }
 int ipc_tx_waiting(void){ return g_txn; }
+/* Withdraw waiting frames that start with prefix (e.g. a cancelled Bluetooth codec switch's "06b3"): a cancelled
+ * operation must not act later just because its frame was still in line. Order of the rest is kept. */
+int ipc_drop_queued(const char *prefix){
+    int dropped = 0; size_t n = strlen(prefix);
+    pthread_mutex_lock(&g_txmu);
+    txe_t keep[TX_MAX]; int k = 0;
+    for(int i = 0; i < g_txn; i++){
+        txe_t *e = &g_txq[(g_txh + i) % TX_MAX];
+        if(!strncmp(e->f, prefix, n)){ dropped++; continue; }
+        keep[k++] = *e;
+    }
+    for(int i = 0; i < k; i++) g_txq[(g_txh + i) % TX_MAX] = keep[i];
+    g_txn = k;
+    pthread_mutex_unlock(&g_txmu);
+    if(dropped){ fprintf(stderr, "ipc: withdrew %d waiting '%s' frame(s)\n", dropped, prefix); fflush(stderr); }
+    return dropped;
+}
 /* A quiet window (UI thread): sends inside it never raise the toast; failures are counted for the caller instead
  * (the settings re-sync after a player (re)start floods a just-woken player whose queue can be briefly full). */
 static int g_quiet_n, g_quiet_fails;

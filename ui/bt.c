@@ -64,6 +64,22 @@ static void scan_kick(void);              /* fwd - off-thread re-enumerate (no d
 static void bt_autoroute_start(void);      /* fwd */
 static void bt_autoroute_stop(void);       /* fwd */
 static void bt_remember_last(const char *mac);   /* fwd */
+static void bt_reap_bounded(pid_t pid);          /* fwd */
+static pid_t g_conn_pid;                          /* the running pair/connect attempt, 0 = none */
+static char g_disc_mac[20]; static uint32_t g_disc_until;   /* N03: just disconnected: don't auto-route back to it */
+static void conn_proc_stop(void){
+    if(g_conn_pid > 0){
+        if(waitpid(g_conn_pid, NULL, WNOHANG) == 0){ kill(-g_conn_pid, SIGTERM); kill(g_conn_pid, SIGTERM); bt_reap_bounded(g_conn_pid); }
+        g_conn_pid = 0;
+    }
+}
+static pid_t g_scan_pid;                          /* the running device search (bluetoothctl scan), 0 = none */
+static void scan_proc_stop(void){                 /* end our device search: its BlueZ session goes with it */
+    if(g_scan_pid > 0){
+        if(waitpid(g_scan_pid, NULL, WNOHANG) == 0){ kill(-g_scan_pid, SIGTERM); kill(g_scan_pid, SIGTERM); bt_reap_bounded(g_scan_pid); }
+        g_scan_pid = 0;
+    }
+}
 
 /* The refresh glyph INSIDE the "Scanning" message spins while a scan runs. It lives
  * in g_list, so it must be stopped before g_list is cleaned (else the anim references
@@ -86,9 +102,15 @@ static void bt_reap_stuck(void){
     for(int i = 0; i < BT_STUCK_MAX; i++) if(g_bt_stuck[i] > 0 && waitpid(g_bt_stuck[i], NULL, WNOHANG) != 0) g_bt_stuck[i] = 0;
     pthread_mutex_unlock(&g_bt_stuck_mu);
 }
+static __thread int g_last_exit = -1;                    /* exit status of this thread's last run_cap_to command (-1: unknown) */
 static void bt_reap_bounded(pid_t pid){
     for(int pass = 0; pass < 2; pass++){
-        for(int i = 0; i < 20; i++){ if(waitpid(pid, NULL, WNOHANG) != 0) return; usleep(5000); }   /* ~100 ms */
+        for(int i = 0; i < 20; i++){                         /* ~100 ms */
+            int st = 0; pid_t r = waitpid(pid, &st, WNOHANG);
+            if(r == pid){ g_last_exit = WIFEXITED(st) ? WEXITSTATUS(st) : -1; return; }
+            if(r != 0) return;
+            usleep(5000);
+        }
         kill(-pid, SIGKILL); kill(pid, SIGKILL);            /* still there: make sure it is really being killed */
     }
     pthread_mutex_lock(&g_bt_stuck_mu);
@@ -101,8 +123,12 @@ static void bt_reap_bounded(pid_t pid){
  * gets its own process group so a timeout kills the whole pipeline. Returns bytes read, -1 on timeout. */
 static int run_cap_to(const char *cmd, char *out, int cap, int ms){
     out[0] = 0;
+    g_last_exit = -1;
     bt_reap_stuck();
-    int fd[2]; if(pipe(fd) != 0) return 0;
+    /* close-on-exec: a helper started at the same moment by another thread must not inherit this pipe's writer, or
+     * this reader sees no end-of-file until that unrelated helper exits (false time-outs). The child's own copy is
+     * the dup2() onto stdout below, which posix_spawn makes without the flag. */
+    int fd[2]; if(pipe2(fd, O_CLOEXEC) != 0) return 0;
     posix_spawn_file_actions_t fa; posix_spawn_file_actions_init(&fa);
     posix_spawn_file_actions_adddup2(&fa, fd[1], 1);
     posix_spawn_file_actions_addclose(&fa, fd[0]);
@@ -319,12 +345,16 @@ static int bt_codec_frame_value(const char *mac, int v, char *out, int cap);
 #define BTC_AAC  2u
 #define BTC_LDAC 4u
 static unsigned bt_codec_need(int v){ return v == 1 ? BTC_AAC : (v >= 2 && v <= 4) ? BTC_LDAC : 0u; }
-/* The stock VALUE1 to send: the saved choice, or SBC when the sink is known not to offer that codec. */
+/* The stock VALUE1 to send. The saved choice when the sink offers it; any LDAC choice steps down to AAC when the sink
+ * offers AAC but not LDAC; SBC only when neither is offered (or the sink's list is unknown). */
 int bt_codec_pick(int choice, unsigned avail, int avail_known){
     if(choice < 0 || choice >= BT_CODEC_N) return 0;
     unsigned need = bt_codec_need(choice);
-    if(need && !(avail_known && (avail & need))) return 0;   /* offered, or unknown: SBC */
-    return choice;
+    if(!need) return choice;                                  /* SBC chosen */
+    if(!avail_known) return 0;                                /* unknown: SBC */
+    if(avail & need) return choice;                           /* offered as chosen */
+    if(need == BTC_LDAC && (avail & BTC_AAC)) return 1;       /* LDAC not offered: AAC first */
+    return 0;                                                 /* neither: SBC */
 }
 /* Codecs a sink offers, from `bluealsa-cli info <pcm>`: the words on the "Available codecs:" line and on the lines
  * after it that carry no ':'. *known = 0 when that header is missing (unparseable/failed query). */
@@ -432,21 +462,34 @@ int bt_codec_upgrade_step(void){
     snprintf(mac, sizeof mac, "%s", g_cq.mac);
     if(!g_cq.armed || strcmp(ui_route_mac(), mac)) done = 1;                 /* cancelled or routed away: forget it */
     else if(g_cq.state == 2){
-        if(g_cq.pcm){
-            int v = bt_codec_pick(g_cq.choice, g_cq.avail, g_cq.known);      /* unknown/unlisted -> SBC = nothing to do */
-            if(v != 0) send = v;
-            done = 1; g_cq.applied = 1;
-        } else if(++g_cq.misses >= BT_PCM_TRIES){ done = 1; g_cq.applied = 1; }
+        if(g_cq.pcm && g_cq.known){                                      /* the link is there and says what it can do */
+            int v = bt_codec_pick(g_cq.choice, g_cq.avail, g_cq.known);  /* unlisted -> SBC = nothing to do */
+            if(v != 0) send = v;                                         /* applied only once the command went out */
+            else { done = 1; g_cq.applied = 1; }
+        } else if(++g_cq.misses >= BT_PCM_TRIES){ done = 1; g_cq.applied = 1; }   /* no link, or its codecs never known */
         g_cq.state = 0;
     }
     if(!done && g_cq.state == 0 && (spawn = malloc(sizeof *spawn)) != NULL){
         spawn->gen = g_cq.gen; snprintf(spawn->mac, sizeof spawn->mac, "%s", mac); g_cq.state = 1;
     }
     if(done) g_cq.armed = 0;
+    unsigned gen_now = g_cq.gen;
     pthread_mutex_unlock(&g_cq_mu);
-    if(send > 0 && bt_codec_frame_value(mac, send, f, sizeof f) == 0){
-        ipc_send_cmd(f);
-        ui_resume_guard_arm(2, mac);           /* the switch renegotiates the link mid-song: make sure music goes on */
+    if(send > 0){
+        int sent = bt_codec_frame_value(mac, send, f, sizeof f) == 0 && ipc_send_cmd(f) == 0;
+        pthread_mutex_lock(&g_cq_mu);
+        if(g_cq.gen == gen_now && g_cq.armed){
+            if(sent){ g_cq.armed = 0; g_cq.applied = 1; done = 1; }
+            else if(++g_cq.misses >= BT_PCM_TRIES){
+                if(send >= 2 && (g_cq.avail & BTC_AAC)){           /* LDAC never got through: try AAC before SBC */
+                    g_cq.choice = 1; g_cq.misses = 0;
+                    fprintf(stderr, "bt codec: LDAC request failed, trying AAC\n"); fflush(stderr);
+                } else { g_cq.armed = 0; g_cq.applied = 1; done = 1; }   /* gave up: SBC */
+            }
+            /* else: still armed, the next tick probes and tries again */
+        }
+        pthread_mutex_unlock(&g_cq_mu);
+        if(sent) ui_resume_guard_arm(2, mac);  /* the switch renegotiates the link mid-song: make sure music goes on */
     }
     if(spawn){ pthread_t t;
                if(pthread_create(&t, NULL, bt_codec_probe_thread, spawn) == 0) pthread_detach(t);
@@ -465,6 +508,9 @@ void ui_bt_codec_upgrade_cancel(void){
     pthread_mutex_lock(&g_cq_mu);
     g_cq.gen++; g_cq.armed = 0; g_cq.applied = 0; g_cq.state = 0;
     pthread_mutex_unlock(&g_cq_mu);
+    /* N01: an AAC/LDAC request still in line goes too - only those (VALUE1 1-4), never the route's own SBC frame
+     * (VALUE1 0), which the auto-route poll's routine cancels right after a route must not withdraw */
+    for(int v = 1; v <= 4; v++){ char pre[16]; snprintf(pre, sizeof pre, "06b3%04X%04X", 12u + 17u, (unsigned)v); ipc_drop_queued(pre); }
 }
 /* Called after a route to `mac`. fresh = a full route sequence just re-sent the SBC frame: it cancels whatever was
  * pending and, if AAC/LDAC is chosen, arms a new upgrade. fresh = 0 (already routed there, e.g. a tap) keeps a
@@ -494,9 +540,15 @@ static void bt_enable(void){
     /* Create the cancel marker SYNCHRONOUSLY before the backgrounded subshell, so it exists by
      * the time we return. bt_enable()/bt_disable() are both main-thread + serialized, so a
      * later bt_disable() `rm` always beats the async subshell - no touch-vs-rm race. */
-    system("touch /tmp/bt_enabling 2>/dev/null");
-    system(
-        "( T(){ \"$@\" & p=$!; ( sleep 6; kill -9 $p 2>/dev/null ) & w=$!; wait $p; kill $w 2>/dev/null; }; "   /* 6 s cap per bluetoothctl */
+    /* Each bring-up writes its own token into the marker and checks for THAT token: a newer bring-up (after an
+     * off -> on) makes an older one stop at its next check instead of both running. */
+    static unsigned bt_gen;
+    unsigned tok = (unsigned)time(NULL) * 1000u + (++bt_gen % 1000u);
+    { FILE *m = fopen("/tmp/bt_enabling", "w"); if(m){ fprintf(m, "%u\n", tok); fclose(m); } }
+    char script[3072];
+    snprintf(script, sizeof script,
+        "( A(){ [ \"$(cat /tmp/bt_enabling 2>/dev/null)\" = %u ]; }; "                 /* still the current bring-up? */
+        "  T(){ \"$@\" & p=$!; ( sleep 6; kill -9 $p 2>/dev/null ) & w=$!; wait $p; kill $w 2>/dev/null; }; "   /* 6 s cap per bluetoothctl */
         "  i=0; while [ -e /tmp/bt_disabling ] && [ \"$i\" -lt 40 ]; do sleep 0.25; i=$((i+1)); done; "   /* let a just-started teardown finish first (it would kill this bring-up) */
         "  killall -9 fiio_bluetoothctl brcm_patchram_plus bluetoothd bluealsa 2>/dev/null; "
         "  hciconfig hci0 down 2>/dev/null; "
@@ -505,28 +557,29 @@ static void bt_enable(void){
          * (without the block/unblock cycle, re-patchram on an already-firmwared chip
          * hangs and hci0 never appears - verified on-device). */
         "  rfkill block bluetooth; sleep 1; "
-        "  [ -e /tmp/bt_enabling ] || exit; "     /* disabled during the block? leave BT blocked (off) */
+        "  A || exit; "     /* disabled or superseded during the block? leave it to the newer state */
         "  rfkill unblock bluetooth; sleep 1; "
-        "  [ -e /tmp/bt_enabling ] || exit; "
+        "  A || exit; "
         "  brcm_patchram_plus --enable_lpm --enable_hci --no2bytes --tosleep 200000 --baudrate 3000000 "
         "    --patchram /lib/firmware/bt_bcm/BCM4343A1_001.002.009.1026.1055.hcd /dev/ttyS0 >/tmp/patchram.log 2>&1 & "
         /* patchram can take well over 5s to attach hci0; keep retrying `up` until it's
          * RUNNING (up to ~20s) so we never give up before the chip is ready and leave hci0
          * DOWN (which made bt_on() report "off" and the toggle time out). Each pass re-checks
          * the marker so a toggle-off aborts the loop promptly. */
-        "  i=0; while [ \"$i\" -lt 40 ]; do [ -e /tmp/bt_enabling ] || exit; hciconfig hci0 up 2>/dev/null; "
+        "  i=0; while [ \"$i\" -lt 40 ]; do A || exit; hciconfig hci0 up 2>/dev/null; "
         "    hciconfig hci0 2>/dev/null | grep -q RUNNING && break; sleep 0.5; i=$((i+1)); done; "
-        "  [ -e /tmp/bt_enabling ] || exit; "     /* disabled during bring-up -> don't start the daemons */
+        "  A || exit; "     /* disabled during bring-up -> don't start the daemons */
         "  /usr/project/bluetoothd --noplugin=sap --plugin=a2dp,avrcp --mode=source >/tmp/btd.log 2>&1 & "
         "  bluealsa -S --device=hci0 --profile=a2dp-source --sbc-quality=medium "
         "    --ldac-abr --ldac-quality=standard --codec=sbc --initial-volume=48 >/tmp/bluealsa.log 2>&1 & "
         /* hci0 UP alone leaves bluez Powered:no - power the controller on explicitly (needs
          * bluetoothd, hence after its start) so bt_on()'s "Powered: yes" check passes. */
-        "  sleep 1; [ -e /tmp/bt_enabling ] || exit; "
+        "  sleep 1; A || exit; "
         "  T bluetoothctl power on; hciconfig hci0 piscan; hciconfig hci0 class 0x200414; "
         "  T bluetoothctl agent on; T bluetoothctl default-agent; T bluetoothctl pairable on; "
-        "  rm -f /tmp/bt_enabling "     /* enable finished: drop the marker */
-        ") >/dev/null 2>&1 &");
+        "  A && rm -f /tmp/bt_enabling "     /* enable finished: drop the marker (only if still ours) */
+        ") >/dev/null 2>&1 &", tok);
+    system(script);
     /* NB: bluealsa is started INSIDE the subshell above (after hci0 is RUNNING +
      * bluetoothd), not here, so it never races the patchram attach. */
 }
@@ -541,10 +594,13 @@ static void bt_disable(void){
      * binary, so instead of a graceful daemon power-off (which could hang the subshell before the kill)
      * we KILL the daemons FIRST - direct, fast, no D-Bus round-trip - then drop the interface and
      * rfkill-block. rm the enable marker first so any in-flight bt_enable() subshell aborts. */
-    system("( rm -f /tmp/bt_enabling; "
-           "killall -9 bluealsa bluetoothd brcm_patchram_plus fiio_bluetoothctl bt-agent 2>/dev/null; "
+    /* Synchronously: drop the bring-up marker (an in-flight bring-up stops at its next check, and a following "on"
+     * is not mistaken for one already running) and set the teardown marker, which a following bring-up waits for. */
+    unlink("/tmp/bt_enabling");
+    { FILE *m = fopen("/tmp/bt_disabling", "w"); if(m) fclose(m); }
+    system("( killall -9 bluealsa bluetoothd brcm_patchram_plus fiio_bluetoothctl bt-agent 2>/dev/null; "
            "hciconfig hci0 down >/dev/null 2>&1; "
-           "rfkill block bluetooth >/dev/null 2>&1 ) >/dev/null 2>&1 &");
+           "rfkill block bluetooth >/dev/null 2>&1; rm -f /tmp/bt_disabling ) >/dev/null 2>&1 &");
 }
 
 /* A Bluetooth MAC must be exactly AA:BB:CC:DD:EE:FF (hex + colons) before it is ever
@@ -584,7 +640,16 @@ static void bt_autoroute_poll_cb(lv_timer_t *t){
             }
         }
     }
-    if(!found){ g_bt_autorouted[0] = 0; ui_bt_codec_upgrade_cancel(); return; }
+    /* B01: one empty answer can be a probe hiccup; two in a row (6 s) mean the link is really gone. Then the route
+     * record goes too, so the same headphones coming back get the full routing sequence again, not "already routed". */
+    static int missing;
+    if(!found){
+        g_bt_autorouted[0] = 0; ui_bt_codec_upgrade_cancel();
+        if(++missing == 2 && ui_route_mac()[0]){ void ui_route_forget(const char *why); ui_route_forget("link gone"); }
+        return;
+    }
+    missing = 0;
+    if(g_disc_mac[0] && !strcmp(mac, g_disc_mac) && (int32_t)(lv_tick_get() - g_disc_until) < 0) return;   /* N03 */
     if(strcmp(mac, g_bt_autorouted)){
         if(ui_route_bt(mac) == 0){    /* latch only on a successful route, else retry on the next poll */
             snprintf(g_bt_autorouted, sizeof g_bt_autorouted, "%s", mac);
@@ -606,6 +671,9 @@ static void bt_reconnect_last(void){
              "T bluetoothctl connect %s && exit; sleep 5; done ) >/dev/null 2>&1 &", mac, mac);
     system(cmd);
 }
+/* A source change (USB DAC, Bluetooth receiving, back to playback...) owns the output: forget the auto-route latch so
+ * returning to playback routes to the headphones afresh (B02). */
+void bt_autoroute_reset(void){ g_bt_autorouted[0] = 0; ui_bt_codec_upgrade_cancel(); }
 static void bt_autoroute_start(void){
     if(g_bt_autoroute_timer) return;
     g_bt_autoroute_timer = lv_timer_create(bt_autoroute_poll_cb, 3000, NULL);
@@ -698,8 +766,11 @@ static void bt_conn_poll_cb(lv_timer_t *t){
         /* Connected at the BT layer. Only claim "Connected" (audio routed) if the route sequence
          * actually went through; otherwise stay honest and leave g_bt_autorouted unset so the
          * autoroute poll keeps retrying the route. */
-        if(ui_route_bt(g_bt_conn_mac) == 0){
+        int routed = ui_route_bt(g_bt_conn_mac);
+        if(routed == 0){
             snprintf(g_bt_autorouted, sizeof g_bt_autorouted, "%s", g_bt_conn_mac);
+            ui_toast("Connected");
+        } else if(routed == -2){            /* deferred while a song starts: the auto-route poll routes it shortly */
             ui_toast("Connected");
         } else {
             ui_toast("Paired - audio stays on player");
@@ -716,14 +787,26 @@ static void bt_conn_poll_cb(lv_timer_t *t){
 
 static void bt_connect(const char *mac){
     if(!bt_mac_valid(mac)){ ui_toast("Bad device address"); return; }
+    scan_proc_stop();                                   /* stop our search first: pairing during discovery fails often */
     char cmd[512];
     /* Stop discovery first (pairing/connecting during an inquiry fails often on this chip), and pair only a device
      * that isn't paired yet (re-pairing confuses some headphones). */
     snprintf(cmd, sizeof cmd,
-             "( bluetoothctl scan off; bluetoothctl info %s 2>/dev/null | grep -q 'Paired: yes' || bluetoothctl pair %s; "
-             "bluetoothctl trust %s; bluetoothctl connect %s ) >/dev/null 2>&1 &",
+             "bluetoothctl scan off; bluetoothctl info %s 2>/dev/null | grep -q 'Paired: yes' || bluetoothctl pair %s; "
+             "bluetoothctl trust %s; bluetoothctl connect %s",
              mac, mac, mac, mac);
-    system(cmd);
+    conn_proc_stop();                                   /* a previous attempt still running: this one replaces it */
+    {   /* our own child in its own process group, so Disconnect can stop it (N03) */
+        posix_spawn_file_actions_t fa; posix_spawn_file_actions_init(&fa);
+        posix_spawn_file_actions_addopen(&fa, 1, "/dev/null", O_WRONLY, 0);
+        posix_spawn_file_actions_addopen(&fa, 2, "/dev/null", O_WRONLY, 0);
+        posix_spawnattr_t at; posix_spawnattr_init(&at);
+        posix_spawnattr_setflags(&at, POSIX_SPAWN_SETPGROUP); posix_spawnattr_setpgroup(&at, 0);
+        char *argv[] = { "sh", "-c", cmd, NULL }; extern char **environ; pid_t pid;
+        if(posix_spawn(&pid, "/bin/sh", &fa, &at, argv, environ) == 0) g_conn_pid = pid;
+        posix_spawn_file_actions_destroy(&fa); posix_spawnattr_destroy(&at);
+    }
+    if(!strcmp(g_disc_mac, mac)) g_disc_mac[0] = 0;   /* connecting again lifts an earlier Disconnect's block */
     snprintf(g_bt_conn_mac, sizeof g_bt_conn_mac, "%s", mac);
     ui_toast("Connecting...");
     g_bt_conn_start = lv_tick_get();
@@ -732,6 +815,15 @@ static void bt_connect(const char *mac){
 }
 static void bt_disconnect(const char *mac){
     if(!bt_mac_valid(mac)) return;
+    /* N03: a Disconnect supersedes the connection attempt at every layer: its watcher, its cached "connected" result,
+     * its pair/connect process; and for a few seconds the auto-route won't route to these headphones while their link
+     * is still going down. */
+    if(!strcmp(mac, g_bt_conn_mac)){
+        if(g_bt_conn_timer){ lv_timer_del(g_bt_conn_timer); g_bt_conn_timer = NULL; }
+        g_bt_conn_mac[0] = 0; conn_proc_stop();
+        pthread_mutex_lock(&g_cc_mu); g_cc_mac[0] = 0; g_cc_yes = 0; pthread_mutex_unlock(&g_cc_mu);
+    }
+    snprintf(g_disc_mac, sizeof g_disc_mac, "%s", mac); g_disc_until = lv_tick_get() + 8000;
     if(!strcmp(mac, g_bt_autorouted)) g_bt_autorouted[0] = 0;
     ui_route_analog();          /* return audio to the DAC before dropping the A2DP link */
     char cmd[128];
@@ -828,25 +920,40 @@ void bt_codec_apply_async(const char *mac){
  * background probe so the UI thread never waits on bluetoothctl. Cached; re-probed at most every 4 s. */
 static pthread_mutex_t g_pr_mu = PTHREAD_MUTEX_INITIALIZER;
 static char g_pr_name[64]; static int g_pr_conn = 0, g_pr_running = 0; static uint32_t g_pr_at = 0, g_pr_have = 0;
+/* N04 (Bluetooth findings, 21 Oct): this BlueZ (5.54) can't list only connected devices, so each pass asks about at
+ * most 8 of the known ones - first the one found connected last time, then 8 more starting where the previous pass
+ * stopped - so a connected device anywhere in a long list is found within a few passes. */
+static int g_pr_offset; static char g_pr_last[18];          /* [g_pr_mu] */
 static void *peer_worker(void *a){
     (void)a; char buf[4096], name[64] = {0}; int conn = 0;
     if(run_cap_to("bluetoothctl devices 2>/dev/null", buf, sizeof buf, 2500) > 0){
-        char *l = buf; int tried = 0;
-        while(l && *l && !conn && tried < 8){
+        char macs[64][18], names[64][64]; int n = 0;
+        for(char *l = buf; l && *l && n < 64; ){
             char *nl = strchr(l, '\n'); if(nl) *nl = 0;
             if(!strncmp(l, "Device ", 7) && strlen(l) > 7 + 17){
                 char mac[20]; memcpy(mac, l + 7, 17); mac[17] = 0;
-                if(bt_mac_valid(mac)){
-                    char cmd[128], info[2048], cv[16]; tried++;
-                    snprintf(cmd, sizeof cmd, "bluetoothctl info %s 2>/dev/null", mac);
-                    if(run_cap_to(cmd, info, sizeof info, 1500) < 0) break;
-                    if(bt_info_prop(info, "Connected:", cv, sizeof cv) && !strcmp(cv, "yes")){
-                        conn = 1; snprintf(name, sizeof name, "%s", l + 7 + 17 + 1);
-                    }
-                }
+                if(bt_mac_valid(mac)){ snprintf(macs[n], 18, "%s", mac); snprintf(names[n], 64, "%s", l + 7 + 17 + 1); n++; }
             }
             if(!nl) break; l = nl + 1;
         }
+        pthread_mutex_lock(&g_pr_mu); int off = n ? g_pr_offset % n : 0; char last[18]; snprintf(last, sizeof last, "%s", g_pr_last); pthread_mutex_unlock(&g_pr_mu);
+        int order[9], m = 0;
+        for(int i = 0; i < n; i++) if(last[0] && !strcmp(macs[i], last)){ order[m++] = i; break; }
+        for(int k = 0; k < n && m < 9; k++){ int i = (off + k) % n; if(m && i == order[0]) continue; order[m++] = i; }
+        int asked = 0;
+        for(int j = 0; j < m && !conn; j++){
+            char cmd[128], info[2048], cv[16];
+            snprintf(cmd, sizeof cmd, "bluetoothctl info %s 2>/dev/null", macs[order[j]]);
+            if(run_cap_to(cmd, info, sizeof info, 1500) < 0) break;
+            asked++;
+            if(bt_info_prop(info, "Connected:", cv, sizeof cv) && !strcmp(cv, "yes")){
+                conn = 1; snprintf(name, sizeof name, "%s", names[order[j]]);
+                pthread_mutex_lock(&g_pr_mu); snprintf(g_pr_last, sizeof g_pr_last, "%s", macs[order[j]]); pthread_mutex_unlock(&g_pr_mu);
+            }
+        }
+        pthread_mutex_lock(&g_pr_mu);
+        if(!conn && n) g_pr_offset = (off + (asked > 8 ? 8 : asked)) % n;   /* next pass continues after these */
+        pthread_mutex_unlock(&g_pr_mu);
     }
     pthread_mutex_lock(&g_pr_mu);
     g_pr_conn = conn; snprintf(g_pr_name, sizeof g_pr_name, "%s", name); g_pr_have = 1; g_pr_running = 0;
@@ -899,7 +1006,12 @@ static void info_forget_cb(lv_event_t *e){
         bt_disconnect(g_sel_mac);   /* route audio back to analog + clear g_route/autoroute BEFORE removing the sink */
         char cmd[128];
         snprintf(cmd, sizeof cmd, "bluetoothctl remove %s >/dev/null 2>&1", g_sel_mac);
-        { char o[256]; ui_toast(run_cap_to(cmd, o, sizeof o, 5000) >= 0 ? "Device forgotten" : "Couldn't forget device"); }
+        {   char o[256], chk[96], info[512];
+            int ok = run_cap_to(cmd, o, sizeof o, 5000) >= 0 && g_last_exit == 0;     /* the command really succeeded */
+            if(ok){ snprintf(chk, sizeof chk, "bluetoothctl info %s 2>/dev/null", g_sel_mac);   /* and it's really gone */
+                    if(run_cap_to(chk, info, sizeof info, 3000) > 0 && strstr(info, g_sel_mac)) ok = 0; }
+            if(ok && !strcmp(cfg_get_str("bt_last", ""), g_sel_mac)) cfg_set_str("bt_last", "");   /* don't call it back */
+            ui_toast(ok ? "Device forgotten" : "Couldn't forget device"); }
     }
     screen_back();
     if(g_scan_timer) lv_timer_del(g_scan_timer);
@@ -1217,7 +1329,20 @@ static void start_scan(void){
     list_msg_scanning();
     /* Classic BR/EDR inquiry - what BT speakers/headphones use - needs ~10-12s to find and
      * resolve a device's name/class; the old 6s window quit before speakers ever appeared. */
-    system("bluetoothctl --timeout 13 scan on >/dev/null 2>&1 &");
+    scan_proc_stop();                                       /* never two searches at once */
+    {   /* the search is our own child (own process group): stopping it ends its BlueZ discovery session, which a
+         * separate "bluetoothctl scan off" cannot (BlueZ ties a discovery session to the client that started it) */
+        posix_spawn_file_actions_t fa; posix_spawn_file_actions_init(&fa);
+        posix_spawn_file_actions_addopen(&fa, 1, "/dev/null", O_WRONLY, 0);
+        posix_spawn_file_actions_addopen(&fa, 2, "/dev/null", O_WRONLY, 0);
+        posix_spawnattr_t at; posix_spawnattr_init(&at);
+        posix_spawnattr_setflags(&at, POSIX_SPAWN_SETPGROUP); posix_spawnattr_setpgroup(&at, 0);
+        char *argv[] = { "bluetoothctl", "--timeout", "13", "scan", "on", NULL };
+        extern char **environ;
+        pid_t pid;
+        if(posix_spawnp(&pid, "bluetoothctl", &fa, &at, argv, environ) == 0) g_scan_pid = pid;
+        posix_spawn_file_actions_destroy(&fa); posix_spawnattr_destroy(&at);
+    }
     if(g_scan_timer) lv_timer_del(g_scan_timer);
     g_scan_timer = lv_timer_create(scan_timer_cb, 13500, NULL);
     lv_timer_set_repeat_count(g_scan_timer, 1);

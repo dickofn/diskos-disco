@@ -37,6 +37,7 @@
 #include "modes.h"
 #include "anim.h"
 #include "ipc.h"
+#include "crashlog.h"
 #include "fwcaps.h"
 #include "musicdb.h"
 #include "prof.h"
@@ -341,17 +342,28 @@ const char *ui_route_mac(void){ return g_route_mac; }   /* device the player is 
 int ui_local_playback_allowed(void);
 void ui_resume_guard_arm(int reason, const char *mac);
 static void resume_guard_start(int reason, const char *mac, int force);
+void ui_resume_guard_cancel(void);
+int ui_get_source_mode(void);
+static uint32_t g_play_pending;                          /* defined with the play-initiation state below */
 int bt_codec_upgrade_pending(void);                      /* bt.c: an AAC/LDAC switch is still to come for this route */
 /* Music held back while the codec switches (set by ui_route_bt, released by route_hold_tick or the user). */
 static uint32_t g_hold_since, g_hold_settle; static char g_hold_mac[20];
+static char g_hold_path[256]; static int g_hold_pos_id; static unsigned g_hold_path_seq, g_hold_gen;
 static void route_hold_start(const char *mac){
     g_hold_since = lv_tick_get() | 1; g_hold_settle = 0; snprintf(g_hold_mac, sizeof g_hold_mac, "%s", mac);
+    /* B03: the hold belongs to THIS song in THIS player session; anything else playing by the end is not ours */
+    track_state_t st; ipc_get_state(&st);
+    snprintf(g_hold_path, sizeof g_hold_path, "%s", st.path); g_hold_pos_id = st.pos_id;
+    g_hold_path_seq = st.path_seq; g_hold_gen = ipc_generation();
     fprintf(stderr, "route hold: waiting for the codec switch before playing\n"); fflush(stderr);
 }
 void ui_route_hold_cancel(void){ g_hold_since = 0; g_hold_settle = 0; }   /* the user pressed Play/Pause: their call */
 static void route_hold_tick(void){
     if(!g_hold_since) return;
     if(strcmp(g_hold_mac, g_route_mac)){ ui_route_hold_cancel(); return; } /* routed elsewhere meanwhile */
+    {   track_state_t st; ipc_get_state(&st);                             /* another song or session: not ours */
+        if(g_hold_gen != ipc_generation() || strcmp(g_hold_path, st.path) || g_hold_pos_id != st.pos_id
+           || g_hold_path_seq != st.path_seq){ ui_route_hold_cancel(); return; } }
     int pending = bt_codec_upgrade_pending();
     if(pending){
         if(lv_tick_elaps(g_hold_since) < 8000) return;
@@ -362,11 +374,22 @@ static void route_hold_tick(void){
         if(lv_tick_elaps(g_hold_settle) < 1500) return;
     }
     ui_route_hold_cancel();
+    if(g_playing){ fprintf(stderr, "route hold: already playing, nothing to do\n"); fflush(stderr); return; }   /* a toggle would PAUSE it */
     if(ipc_send_cmd("0201000C0000") == 0){ resume_guard_start(1, g_hold_mac, 1); fprintf(stderr, "route hold: playing\n"); fflush(stderr); }
+}
+/* The route is no longer valid (the headphones' link is gone, or the source changed): forget it with everything that
+ * hangs off it - the codec switch, the hold and the resume guard - so the next route to the same headphones is a
+ * full one (B01/B02). */
+void ui_route_forget(const char *why){
+    if(!g_route_mac[0]) return;
+    fprintf(stderr, "route BT %s forgotten (%s)\n", g_route_mac, why ? why : ""); fflush(stderr);
+    g_route_mac[0] = 0;
+    ui_bt_codec_upgrade_cancel(); ui_route_hold_cancel(); ui_resume_guard_cancel();
 }
 int ui_route_bt(const char *mac){
     if(modes_output_busy()) return -1;                  /* an output switch is in flight or recovering: the auto-route poll retries */
     if(!ui_local_playback_allowed()) return -1;
+    if(ui_get_source_mode() != 0) return -1;            /* B02: only while the source is Playback (not USB DAC, receiving...) */
     if(!mac) return -1;
     char norm[20]; route_uppercase(mac, norm, sizeof norm);
     if((int)strlen(norm) != 17) return -1;             /* must be AA:BB:CC:DD:EE:FF */
@@ -375,6 +398,14 @@ int ui_route_bt(const char *mac){
         else if(!((norm[i]>='0'&&norm[i]<='9') || (norm[i]>='A'&&norm[i]<='F'))) return -1;
     }
     if(!strcmp(norm, g_route_mac)){ ui_bt_codec_upgrade_arm(norm, 0); return 0; }   /* already routed to this device */
+    /* P02: a song still starting (a play request in flight, position not moving yet) looks "not playing", so routing
+     * now would arm the AAC/LDAC switch with no hold and switch codec once the song runs. Wait instead: -2 means
+     * "deferred, not refused"; the auto-route poll routes it a few seconds later, through the held path. Checked
+     * after the address is validated, so it never reads a missing or malformed one. */
+    if(g_play_pending && lv_tick_elaps(g_play_pending) < 12000){
+        fprintf(stderr, "route BT deferred: a song is still starting\n"); fflush(stderr);
+        return -2;
+    }
     /* Defer during the player's post-restart settle window: a route sent now could be reverted by the
      * player's late init and leave the caches latched on a stale route. Return "not routed" so no caller
      * latches g_bt_autorouted; the auto-route poll (which keeps firing) routes on the first tick past the
@@ -384,16 +415,29 @@ int ui_route_bt(const char *mac){
     int was_playing = g_playing;   /* real play state; raw st.state is unreliable (reports 0 while playing) so
                                     * the old `st.state==1` was false during playback -> pause was SKIPPED */
     if(was_playing && ipc_send_cmd("0201000C0000") < 0) return -1;   /* pause; abort route if it can't be sent (don't switch output unpaused) */
-    if(ipc_send_cmd("0666000C0006") < 0) return -1;     /* stock pre-stop: normalize local output state */
-    ipc_send_cmd("0642000C0000");                       /* reset network/output mode */
-    ipc_send_cmd("0657000C0008");                       /* work-mode 8 (required orchestration, not our work_mode) */
-    ipc_send_cmd("06c1000C0000");                       /* initialize the player's BT subsystem */
-    if(ipc_send_cmd("0666000C0002") < 0) return -1;     /* out_dev = BT source */
-    modes_output_reset();                               /* no longer on SPDIF / USB audio */
-    ipc_send_cmd("0657000C0008");
+    /* N02 (Bluetooth findings, 21 Oct): every step is required. A rejected one ends the route: nothing is recorded as
+     * routed (the auto-route poll tries again later), the log names the step, and if the music was paused for the
+     * switch the user is told, since no blind play/pause toggle is sent to undo it. */
     char f[48];
     if(ui_bt_codec_frame(norm, f, sizeof f) < 0) return -1;   /* 06b3 with SBC (VALUE1 0) + MAC payload, as always */
-    if(ipc_send_cmd(f) < 0) return -1;
+    const char *const steps[] = {
+        "0666000C0006",                                 /* stock pre-stop: normalize local output state */
+        "0642000C0000",                                 /* reset network/output mode */
+        "0657000C0008",                                 /* work-mode 8 (required orchestration, not our work_mode) */
+        "06c1000C0000",                                 /* initialize the player's BT subsystem */
+        "0666000C0002",                                 /* out_dev = BT source */
+        "0657000C0008",
+        f,                                              /* the route's SBC codec frame for this device */
+    };
+    for(unsigned i = 0; i < sizeof steps / sizeof *steps; i++){
+        if(ipc_send_cmd(steps[i]) < 0){
+            fprintf(stderr, "route BT %s incomplete: step %u (%.12s) rejected%s\n", norm, i + 1, steps[i],
+                    was_playing ? "; music was paused for it" : ""); fflush(stderr);
+            if(was_playing) ui_toast("Bluetooth didn't start - press Play to resume");
+            return -1;
+        }
+        if(i == 4) modes_output_reset();                /* no longer on SPDIF / USB audio */
+    }
     if(st.volume_seq){ char v[16]; snprintf(v, sizeof v, "0715000C%04X", st.volume); ipc_send_cmd(v); }
     /* Safe minimal resume; deterministic load/play remains a future improvement. */
     if(st.have_track && st.position_ms > 0) ui_seek_to(st.position_ms);  /* resume position, not restart */
@@ -536,6 +580,7 @@ static int storage_player_guarded(void){
     return found > 0 && ok;
 }
 static int source_send(int mode){
+    { void bt_autoroute_reset(void); ui_route_forget("source change"); bt_autoroute_reset(); }   /* B02: the source owns the output now */
     if(ipc_send_cmd("0666000C0006") < 0) return -1;
     modes_output_reset();                                /* every source change starts from the internal DAC route */
     switch(mode){
@@ -824,12 +869,12 @@ static void resume_guard_tick(int playing){
     if(!g_rg_still){ g_rg_still = now | 1; return; }
     if(lv_tick_elaps(g_rg_still) < 3500) return;
     g_rg_still = 0;
-    if(g_rg_reason == 1 && !g_rg_resumed && ipc_send_cmd("0201000C0000") == 0){   /* our own route stopped it: play once */
-        g_rg_resumed = 1; g_rg_until = (now + 7000) | 1;
-        fprintf(stderr, "resume guard: playback stopped after a route, resumed once\n"); fflush(stderr);
-        return;
-    }
+    /* P01 (2.5.9 delayed-pause report): "not playing" here only means the position stopped moving, which can also be
+     * late position reports while the music plays. The only command we have is a play/pause TOGGLE, which would then
+     * PAUSE working audio (seen as a song pausing ~5-6 s in). So the guard never sends one: it only offers the hint. */
     ui_resume_guard_cancel();
+    fprintf(stderr, "resume guard: position not advancing for 3.5 s after a %s; hint shown, no command sent\n",
+            g_rg_reason == 2 ? "codec switch" : "route"); fflush(stderr);
     ui_toast("Playback paused - press Play to resume");
 }
 static char g_play_initpath[256] = "";   /* track path at play-initiation (for the pending-clear) */
@@ -2931,6 +2976,7 @@ int main(int argc, char **argv){
     /* MA Sendspin: this same binary runs the Music Assistant player as a child (ma.c starts it as
      * "ma-sendspin --sendspin ...": a different argv[0], so fiio_init's `pgrep -x mq_ui` never mistakes it for the UI) */
     if(argc > 1 && !strcmp(argv[1], "--sendspin")){ int sendspin_main(int, char **); return sendspin_main(argc - 1, argv + 1); }
+    crashlog_install();          /* /usr/data/diskos_crash.log: a line per start, player restart and crash */
     if(argc > 1 && !strcmp(argv[1], "--boomshine")){        /* the built-in game (Disco menu > Boomshine); log as the app did */
         int boomshine_main(int, char **);
         if(!freopen("/tmp/boomshine.log", "w", stdout)) { /* keep going without a log */ }
@@ -3291,6 +3337,12 @@ int main(int argc, char **argv){
         int playing = playstate_playing(&g_ps, st.have_track, st.position_ms, lv_tick_get(), 1600, 0);
         if(playing) g_play_sent_gen = ipc_generation();   /* playback observed this generation (any start, incl. hardware keys): its one-shot is moot */
         queue_tick(&st, playing);
+        crashlog_tick();             /* freeze detector + memory watch (log only) */
+        {   /* the player restarted underneath us: worth a line in the crash log (who went down first?) */
+            static unsigned seen_gen; unsigned gen = ipc_generation();
+            if(seen_gen && gen != seen_gen) crashlog_note("player restarted (connection %u -> %u)", seen_gen, gen);
+            if(gen) seen_gen = gen;
+        }
         route_hold_tick();
         resume_guard_tick(playing);
         stats_tick(&st, playing);   /* Listening Stats: log songs that really play */
