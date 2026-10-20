@@ -745,8 +745,11 @@ static void bt_conn_poll_cb(lv_timer_t *t){
         /* Connected at the BT layer. Only claim "Connected" (audio routed) if the route sequence
          * actually went through; otherwise stay honest and leave g_bt_autorouted unset so the
          * autoroute poll keeps retrying the route. */
-        if(ui_route_bt(g_bt_conn_mac) == 0){
+        int routed = ui_route_bt(g_bt_conn_mac);
+        if(routed == 0){
             snprintf(g_bt_autorouted, sizeof g_bt_autorouted, "%s", g_bt_conn_mac);
+            ui_toast("Connected");
+        } else if(routed == -2){            /* deferred while a song starts: the auto-route poll routes it shortly */
             ui_toast("Connected");
         } else {
             ui_toast("Paired - audio stays on player");

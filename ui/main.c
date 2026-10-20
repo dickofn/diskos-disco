@@ -344,6 +344,8 @@ void ui_resume_guard_arm(int reason, const char *mac);
 static void resume_guard_start(int reason, const char *mac, int force);
 void ui_resume_guard_cancel(void);
 int ui_get_source_mode(void);
+static uint32_t g_play_pending;                          /* defined with the play-initiation state below */
+static const char *norm_mac_for_defer(const char *mac){ static char n[20]; int j=0; for(int i=0; mac[i] && j<19; i++){ char c=mac[i]; if(c>='a'&&c<='z') c-=32; n[j++]=c; } n[j]=0; return n; }
 int bt_codec_upgrade_pending(void);                      /* bt.c: an AAC/LDAC switch is still to come for this route */
 /* Music held back while the codec switches (set by ui_route_bt, released by route_hold_tick or the user). */
 static uint32_t g_hold_since, g_hold_settle; static char g_hold_mac[20];
@@ -389,6 +391,13 @@ int ui_route_bt(const char *mac){
     if(modes_output_busy()) return -1;                  /* an output switch is in flight or recovering: the auto-route poll retries */
     if(!ui_local_playback_allowed()) return -1;
     if(ui_get_source_mode() != 0) return -1;            /* B02: only while the source is Playback (not USB DAC, receiving...) */
+    /* P02: a song still starting (a play request in flight, position not moving yet) looks "not playing", so routing
+     * now would arm the AAC/LDAC switch with no hold and switch codec once the song runs. Wait instead: -2 means
+     * "deferred, not refused"; the auto-route poll routes it a few seconds later, through the held path. */
+    if(g_play_pending && lv_tick_elaps(g_play_pending) < 12000 && strcmp(norm_mac_for_defer(mac), g_route_mac)){
+        fprintf(stderr, "route BT deferred: a song is still starting\n"); fflush(stderr);
+        return -2;
+    }
     if(!mac) return -1;
     char norm[20]; route_uppercase(mac, norm, sizeof norm);
     if((int)strlen(norm) != 17) return -1;             /* must be AA:BB:CC:DD:EE:FF */
@@ -847,12 +856,12 @@ static void resume_guard_tick(int playing){
     if(!g_rg_still){ g_rg_still = now | 1; return; }
     if(lv_tick_elaps(g_rg_still) < 3500) return;
     g_rg_still = 0;
-    if(g_rg_reason == 1 && !g_rg_resumed && ipc_send_cmd("0201000C0000") == 0){   /* our own route stopped it: play once */
-        g_rg_resumed = 1; g_rg_until = (now + 7000) | 1;
-        fprintf(stderr, "resume guard: playback stopped after a route, resumed once\n"); fflush(stderr);
-        return;
-    }
+    /* P01 (2.5.9 delayed-pause report): "not playing" here only means the position stopped moving, which can also be
+     * late position reports while the music plays. The only command we have is a play/pause TOGGLE, which would then
+     * PAUSE working audio (seen as a song pausing ~5-6 s in). So the guard never sends one: it only offers the hint. */
     ui_resume_guard_cancel();
+    fprintf(stderr, "resume guard: position not advancing for 3.5 s after a %s; hint shown, no command sent\n",
+            g_rg_reason == 2 ? "codec switch" : "route"); fflush(stderr);
     ui_toast("Playback paused - press Play to resume");
 }
 static char g_play_initpath[256] = "";   /* track path at play-initiation (for the pending-clear) */
