@@ -345,7 +345,6 @@ static void resume_guard_start(int reason, const char *mac, int force);
 void ui_resume_guard_cancel(void);
 int ui_get_source_mode(void);
 static uint32_t g_play_pending;                          /* defined with the play-initiation state below */
-static const char *norm_mac_for_defer(const char *mac){ static char n[20]; int j=0; for(int i=0; mac[i] && j<19; i++){ char c=mac[i]; if(c>='a'&&c<='z') c-=32; n[j++]=c; } n[j]=0; return n; }
 int bt_codec_upgrade_pending(void);                      /* bt.c: an AAC/LDAC switch is still to come for this route */
 /* Music held back while the codec switches (set by ui_route_bt, released by route_hold_tick or the user). */
 static uint32_t g_hold_since, g_hold_settle; static char g_hold_mac[20];
@@ -391,13 +390,6 @@ int ui_route_bt(const char *mac){
     if(modes_output_busy()) return -1;                  /* an output switch is in flight or recovering: the auto-route poll retries */
     if(!ui_local_playback_allowed()) return -1;
     if(ui_get_source_mode() != 0) return -1;            /* B02: only while the source is Playback (not USB DAC, receiving...) */
-    /* P02: a song still starting (a play request in flight, position not moving yet) looks "not playing", so routing
-     * now would arm the AAC/LDAC switch with no hold and switch codec once the song runs. Wait instead: -2 means
-     * "deferred, not refused"; the auto-route poll routes it a few seconds later, through the held path. */
-    if(g_play_pending && lv_tick_elaps(g_play_pending) < 12000 && strcmp(norm_mac_for_defer(mac), g_route_mac)){
-        fprintf(stderr, "route BT deferred: a song is still starting\n"); fflush(stderr);
-        return -2;
-    }
     if(!mac) return -1;
     char norm[20]; route_uppercase(mac, norm, sizeof norm);
     if((int)strlen(norm) != 17) return -1;             /* must be AA:BB:CC:DD:EE:FF */
@@ -406,6 +398,14 @@ int ui_route_bt(const char *mac){
         else if(!((norm[i]>='0'&&norm[i]<='9') || (norm[i]>='A'&&norm[i]<='F'))) return -1;
     }
     if(!strcmp(norm, g_route_mac)){ ui_bt_codec_upgrade_arm(norm, 0); return 0; }   /* already routed to this device */
+    /* P02: a song still starting (a play request in flight, position not moving yet) looks "not playing", so routing
+     * now would arm the AAC/LDAC switch with no hold and switch codec once the song runs. Wait instead: -2 means
+     * "deferred, not refused"; the auto-route poll routes it a few seconds later, through the held path. Checked
+     * after the address is validated, so it never reads a missing or malformed one. */
+    if(g_play_pending && lv_tick_elaps(g_play_pending) < 12000){
+        fprintf(stderr, "route BT deferred: a song is still starting\n"); fflush(stderr);
+        return -2;
+    }
     /* Defer during the player's post-restart settle window: a route sent now could be reverted by the
      * player's late init and leave the caches latched on a stale route. Return "not routed" so no caller
      * latches g_bt_autorouted; the auto-route poll (which keeps firing) routes on the first tick past the
