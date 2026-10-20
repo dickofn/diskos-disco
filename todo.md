@@ -1,27 +1,15 @@
 # diskOS Disco! - to do
 
-Live list. Released: 2.5.9 (tag v2.5.9). Older notes: `todo-history.md`.
+Live list. Released: 2.6.0 (tag v2.6.0). Older notes: `todo-history.md`.
 How we work: owner suggests -> Claude offers fixes -> host renders for big visual changes -> owner's go ->
 batch -> one test build -> a few days on the Disc -> one release, one bundle, owner pushes + tags.
 List words: "add to the list" pins an item; "major" / "minor" sorts it; "priority" puts it first.
 Links always point to releases/latest. No upstream diskOS version shown to users.
 
-## Testing now
-- **2.5.9-t2** on the owner's Disc (branch `test/2.5.9-t1`): crash recorder (`/usr/data/diskos_crash.log`: starts,
-  player restarts, crashes with pc/ra/thread, low memory, main-loop stalls), skip pacing (one on-screen skip per
-  300 ms, up to 8 waiting), covers decoded after a song is current 0.3 s, play history written after 1 s, hints and
-  How-to brought up to date (new pages Queue / picking and Start-up / battery). Becomes the next release once stable.
-  Symbol copies of t1 and t2 kept for tracing crash addresses.
-- **On the test branch, not in any build yet:** the updated hints and How-to pages, and the **Bluetooth audit fixes**
-  (2.5.9 Bluetooth audit, 21 Oct): B01 route forgotten when the link is gone, B02 routing only in Playback and
-  forgotten on a source change, B03 codec hold bound to its song/session and never toggling a playing song, B04
-  on/off race (per-bring-up token), B05 close-on-exec capture pipes, B06 failed codec send retried, B07 our own
-  device search stopped before connecting, B09 Forget verifies removal. Tests added (bt_capture, bt_power, route
-  hold). Plus the **delayed-pause report** (21 Oct): P01 the post-route guard never sends a play/pause toggle on a
-  stalled position (it could pause working audio ~5-6 s in; now hint only), P02 no Bluetooth route while a song is
-  still starting (it armed an unheld codec switch; now deferred a few seconds). Needs a test build on the Disc with
-  Bluetooth headphones before release. Also: **codec fallback order** LDAC (any quality) -> AAC -> SBC
-  (owner, 21 Oct), by what the headphones offer and when the LDAC request never gets through.
+## Released: 2.6.0 (2026-10-21)
+- Fast-skipping work (pacing, cover settle, history after 1 s) and the crash log tested on the owner's Disc; the
+  Bluetooth fixes (three audits: B01-B07, B09 part, P01, P02, N01-N04; codec LDAC -> AAC -> SBC) and the hint /
+  How-to update checked with tests and renders only. Watch `/usr/data/diskos_crash.log` reports.
 
 ## Waiting on users
 - #13 / Bluetooth LDAC (2.5.8: music waits for the codec switch; no device search during playback): never tested

@@ -80,6 +80,10 @@ keeps rows flat, **Disco** swings them round the navigation circle like a CD.
 **Play a song.** Library > Songs (or an album, artist, genre or playlist) and tap the song. Song lists have
 Play and Shuffle at the top.
 
+**Skip quickly.** Press Next or Previous as often as you like: Disco sends the skips to the player one every 0.3 s
+and you land on the same song; up to 8 presses can wait, and Play/Pause stops the rest. Covers appear once you
+stop on a song.
+
 **Seek.** On Music, drag or tap the progress line under the title (or the arc around the rim).
 Hold the line or arc instead for a large time preview that follows your finger; the song jumps there when you let go
 (Null has the same hold-to-preview).
@@ -146,6 +150,9 @@ and +. Tap the frequency under the faders to change the band's frequency instead
 to reset it to 0 dB. Changes save to that preset.
 
 **Rename a preset.** On the EQ screen, choose a USER preset and tap Rename.
+
+**Bluetooth codec.** Settings > Network > Bluetooth Codec applies from the next connection. With any LDAC setting,
+headphones without LDAC get AAC when they offer it, and SBC only when they offer neither.
 
 **Use the Disc as a USB DAC, Bluetooth DAC, USB stick or AirPlay speaker.** Pick Working mode in the navigation
 circle (or Mode in Quick Settings) and tap the mode. For USB storage, eject the card on your computer before
@@ -214,6 +221,9 @@ Rescan Library). A small dot runs around the rim while it scans.
 **See a song's bitrate.** Hold the song > Info: the bitrate is next to the file size.
 
 ## Updates, recovery and power
+
+**Disco dropped back to FiiO's interface?** Disco keeps a small crash log: `/usr/data/diskos_crash.log` (over SSH in
+Debug Mode). Its last lines say what happened; please attach them to an issue.
 
 <a id="update-from-the-sd-card"></a>
 **Update from the SD card.**

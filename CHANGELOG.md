@@ -6,6 +6,19 @@ Entries follow the Keep a Changelog format, with Added, Changed, and Fixed categ
 diskOS remains beta software; version numbers do not imply broad hardware or feature validation.
 
 
+## [2.6.0] - 2026-10-21
+
+- Fast skipping: on-screen skips paced (one per 0.3 s, up to 8 waiting); covers decoded once a song has been current
+  0.3 s; play history counted after 1 s.
+- Bluetooth: no automatic play/pause toggles (they could pause working audio a few seconds in); codec fallback LDAC ->
+  AAC -> SBC; reliable re-routing (same headphones, source changes, songs still starting, failed steps reported);
+  search stopped before connecting, Disconnect cancels a pending connection, fast off/on, truthful Forget; stale
+  commands dropped after a player restart; connected device found in long lists. AAC/LDAC untested on a Disc.
+- Help: hints and How-to up to date; new pages Queue / picking and Start-up / battery.
+- Crash log at /usr/data/diskos_crash.log (starts, player restarts, crashes, low memory, stalls).
+
+[2.6.0 release notes](docs/releases/v2.6.0.md)
+
 ## [2.5.9] - 2026-10-20
 
 - Windows app: on every start it checks for a newer release and, if found, updates the installer files inside its
