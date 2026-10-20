@@ -37,6 +37,7 @@
 #include "modes.h"
 #include "anim.h"
 #include "ipc.h"
+#include "crashlog.h"
 #include "fwcaps.h"
 #include "musicdb.h"
 #include "prof.h"
@@ -2931,6 +2932,7 @@ int main(int argc, char **argv){
     /* MA Sendspin: this same binary runs the Music Assistant player as a child (ma.c starts it as
      * "ma-sendspin --sendspin ...": a different argv[0], so fiio_init's `pgrep -x mq_ui` never mistakes it for the UI) */
     if(argc > 1 && !strcmp(argv[1], "--sendspin")){ int sendspin_main(int, char **); return sendspin_main(argc - 1, argv + 1); }
+    crashlog_install();          /* /usr/data/diskos_crash.log: a line per start, player restart and crash */
     if(argc > 1 && !strcmp(argv[1], "--boomshine")){        /* the built-in game (Disco menu > Boomshine); log as the app did */
         int boomshine_main(int, char **);
         if(!freopen("/tmp/boomshine.log", "w", stdout)) { /* keep going without a log */ }
@@ -3291,6 +3293,11 @@ int main(int argc, char **argv){
         int playing = playstate_playing(&g_ps, st.have_track, st.position_ms, lv_tick_get(), 1600, 0);
         if(playing) g_play_sent_gen = ipc_generation();   /* playback observed this generation (any start, incl. hardware keys): its one-shot is moot */
         queue_tick(&st, playing);
+        {   /* the player restarted underneath us: worth a line in the crash log (who went down first?) */
+            static unsigned seen_gen; unsigned gen = ipc_generation();
+            if(seen_gen && gen != seen_gen) crashlog_note("player restarted (connection %u -> %u)", seen_gen, gen);
+            if(gen) seen_gen = gen;
+        }
         route_hold_tick();
         resume_guard_tick(playing);
         stats_tick(&st, playing);   /* Listening Stats: log songs that really play */
