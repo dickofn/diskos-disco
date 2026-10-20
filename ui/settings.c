@@ -1606,19 +1606,24 @@ static void howto_next(lv_event_t *e){
     lv_obj_scroll_to_y(list,((page+1)%count)*240,LV_ANIM_ON);
 }
 static void howto_body(lv_obj_t *root){
-    static const char *titles[]={"Navigate","Navigation menu","Music","Seek / artwork","Quick Settings","Library","Clock / volume","More shortcuts"};
-    char music[256],nav[256],quick[256],more[256];
+    static const char *titles[]={"Navigate","Navigation menu","Music","Seek / artwork","Quick Settings","Library","Queue / picking","Clock / volume","More shortcuts","Start-up / battery"};
+    char music[256],nav[256],quick[256],more[256],seek[256];
     int hold=simple_cfg_get_int(th_null()?"null_title_hold":"disco_title_hold",0);
     int mode=simple_cfg_get_int(th_null()?"null_controls":"disco_controls",0);
     snprintf(nav,sizeof nav,"%s",th_null()?"Side arrow: open menu. Drag text or handle. Hold handle ends to scroll; double-tap / hold its centre for your shortcuts.":"Side tab: open menu. Arrows: browse. Centre icon: open. Double-tap / hold the centre for your chosen shortcuts.");
     snprintf(music,sizeof music,"Title tap: track actions / Mood. Hold: %s. %s",hold==0?"Immersive":hold==1?"favourite / unfavourite":"no action",mode==2?"Double-tap the gesture field: play/pause. Swipe right: next; left: previous.":mode==1?"Auto-fade: tap once to reveal controls, then tap a button.":"Use the previous, play/pause and next buttons.");
-    snprintf(quick,sizeof quick,"Tap Wi-Fi / BT to toggle; hold for connections. Drag brightness. %s",th_null()?"Tap outside / bottom arrow, or swipe up beside the panel to close.":"Swipe up to close.");
+    snprintf(quick,sizeof quick,"Tap Wi-Fi / BT to toggle; hold for connections. Tap EQ to switch it on or off; hold for the Equalizer. Drag brightness. %s",th_null()?"Tap outside / bottom arrow, or swipe up beside the panel to close.":"Swipe up to close.");
     snprintf(more,sizeof more,"%s EQ: tap a band; drag or use +/-. Tap gain/frequency to switch. Power button: pocket lock.",onboarding_gesture_text(HINT_SHORTCUTS));
-    const char *bodies[]={disco_mirror()?"Swipe left from the right edge: back. Swipe up from the bottom on other screens: Music. Pull down from the top: QS.":"Swipe right from the left edge: back. Swipe up from the bottom on other screens: Music. Pull down from the top: QS.",nav,music,th_null()?"Tap or drag progress to seek. Tap full-screen artwork to return. Back swipe closes the track popup.":"Tap / drag progress to seek; hold for precise seeking. Tap full-screen artwork to return. Back swipe closes the track popup.",quick,"Hold songs / albums for actions. Swipe across songs, albums, artists or folders to pick several. Tap A-Z, then a letter. Drag the rim to scroll. Cover flow: drag to browse; tap for tracks; hold to play.","Clock: tap for Weather; hold the top strip to hide/show. Drag volume to adjust; tap outside to dismiss.",more};
+    {   /* Immersive: with Circular control on, taps don't close it (2.5.4) */
+        int circ=simple_cfg_get_int("imm_scrub",0), vol=simple_cfg_get_int("imm_scrub_action",0)==1;
+        const char *imm=circ?(vol?"Full-screen artwork: turn it for volume; swipe from the edge to return.":"Full-screen artwork: turn it to seek; swipe from the edge to return."):"Tap full-screen artwork to return.";
+        snprintf(seek,sizeof seek,"%s %s Back swipe closes the track popup.",th_null()?"Tap or drag progress to seek; hold for a big time preview, let go to jump.":"Tap / drag progress to seek; hold for a big time preview, let go to jump.",imm);
+    }
+    const char *bodies[]={disco_mirror()?"Swipe left from the right edge: back. Swipe up from the bottom on other screens: Music. Pull down from the top: QS.":"Swipe right from the left edge: back. Swipe up from the bottom on other screens: Music. Pull down from the top: QS.",nav,music,seek,quick,"Hold an item for actions. Tap A-Z, then a letter. Drag the rim to scroll. Cover flow: drag to browse; tap for tracks; hold to play.","Swipe across songs, albums, artists or folders to pick several. Queue: add songs, then Play on the Queue screen, even with nothing playing.","Clock: tap for Weather; hold the top strip to hide/show. Drag volume to adjust; tap outside to dismiss.",more,"Hold Volume Up at power-on: the other interface, once. Always: Controls > Default UI. Battery: hold the line under the bar to reset totals."};
     if(th_simple()){
         snprintf(nav,sizeof nav,"Tap D! to open. Drag the wheel to browse; release to snap. Tap the icon to open. D! closes; double-tap D! / hold either icon for your shortcuts.");
-        snprintf(quick,sizeof quick,"Eight icon slots. Tap Wi-Fi / Bluetooth to toggle; hold for connections. Hold other icons for names. Drag the sun arc for brightness; battery arc shows charge.");
-        bodies[6]="Clock: tap for Weather; hold the top strip to hide/show. Drag the bottom volume arc. Tap D! / outside to close; it auto-hides after input stops.";
+        snprintf(quick,sizeof quick,"Eight icon slots. Tap Wi-Fi / Bluetooth to toggle; hold for connections. Tap EQ to switch it; hold for the Equalizer. Hold other icons for names. Drag the sun arc for brightness; battery arc shows charge.");
+        bodies[7]="Clock: tap for Weather; hold the top strip to hide/show. Drag the bottom volume arc. Tap D! / outside to close; it auto-hides after input stops.";
         bodies[1]=nav;bodies[2]="Tap track text for actions / Mood. Double-tap: play/pause. Swipe right: next; left: previous. Hold uses your Title hold setting.";bodies[4]=quick;
     }
     lv_obj_t *list=lv_obj_create(root);lv_obj_remove_style_all(list);
