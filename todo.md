@@ -17,7 +17,10 @@ Links always point to releases/latest. No upstream diskOS version shown to users
   forgotten on a source change, B03 codec hold bound to its song/session and never toggling a playing song, B04
   on/off race (per-bring-up token), B05 close-on-exec capture pipes, B06 failed codec send retried, B07 our own
   device search stopped before connecting, B09 Forget verifies removal. Tests added (bt_capture, bt_power, route
-  hold). Needs a test build on the Disc with Bluetooth headphones before release.
+  hold). Plus the **delayed-pause report** (21 Oct): P01 the post-route guard never sends a play/pause toggle on a
+  stalled position (it could pause working audio ~5-6 s in; now hint only), P02 no Bluetooth route while a song is
+  still starting (it armed an unheld codec switch; now deferred a few seconds). Needs a test build on the Disc with
+  Bluetooth headphones before release.
 
 ## Waiting on users
 - #13 / Bluetooth LDAC (2.5.8: music waits for the codec switch; no device search during playback): never tested
@@ -53,7 +56,8 @@ Links always point to releases/latest. No upstream diskOS version shown to users
   R13 -O2 experiment (measure on the Disc first).
 
 ## Minor
-- From the Bluetooth audit, not done yet: B08 a persistent pairing agent (check on the Disc first whether FiiO's
+- From the Bluetooth audit and the delayed-pause report, not done yet: richer command logging (origin, queued vs
+  delivered, telemetry age) for the next device trace; B08 a persistent pairing agent (check on the Disc first whether FiiO's
   software already provides one; first pairings seem to work); B09 device details/forget off the screen's thread
   (they can still hold the screen up to 4-5 s); B06 confirm which codec was really selected before releasing the
   hold; remove the unused legacy bt_codec_apply_async(); ui/tests/transport_test.py no longer builds (stale harness).
