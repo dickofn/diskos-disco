@@ -357,13 +357,18 @@ Stock is never far:
 
 - **Settings › System › Controls › Default UI › Stock** makes FiiO's interface the normal choice.
 - Hold **Volume Up** from power-on to boot the other interface once.
-- `./diskos-installer restore-stock` (Linux) removes diskOS completely, using the backup made at install. The
-  Windows app keeps that backup in `%LOCALAPPDATA%\diskOS-Disco\backup`.
+- `./diskos-installer restore-stock` (Linux) puts the stock system back, using the backup made at install. Disco's
+  settings stay in the Disc's data area (unused), so a later reinstall comes back with them. The Windows app keeps
+  the backup in `%LOCALAPPDATA%\diskOS-Disco\backup`; keep a copy of it elsewhere too.
+
+**What survives what** (flashing, restoring stock, FiiO updates, switching to upstream diskOS), and the fixes for the
+usual surprises: [Flashing and switching interfaces](docs/SWITCHING.md).
 
 ## Documentation
 
 | | |
 |---|---|
+| [Flashing and switching interfaces](docs/SWITCHING.md) | What stays and what goes when you flash, restore stock or switch |
 | [Tour](docs/DISCO_TOUR.md) | Every screen, gesture and setting, with screenshots |
 | [How-to](docs/HOWTO.md) | Short answers for everyday tasks |
 | [Updating](docs/UPDATING.md) | Keys, signing, flashing once, troubleshooting |

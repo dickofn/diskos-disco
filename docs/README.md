@@ -17,6 +17,8 @@ Switched to Disco from upstream diskOS or another build, and something looks or 
 
 
 - [A tour of Disco!](DISCO_TOUR.md) - every screen, gesture and setting, with screenshots.
+- [Flashing and switching interfaces](SWITCHING.md) - what stays and what goes when you flash, go back to stock or try
+  upstream diskOS, and fixes for the usual surprises.
 - [How-to](HOWTO.md) - short answers for everyday tasks, including the Display menu at a glance.
 - [Display settings](DISPLAY_SETTINGS.md) - what's under each Display page and why some are dimmed.
 - [Immersive controls](IMMERSIVE_CONTROLS.md) - turning the cover to seek or change volume.

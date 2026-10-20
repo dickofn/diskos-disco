@@ -6,6 +6,7 @@
 >
 > **Starts stock after installing?** An earlier "Default UI: Stock" choice survives flashing. Hold **Volume Up** while
 > powering on to start Disco once, then set Settings > System > Controls > Default UI to **diskOS**.
+> More: [what stays and what goes when you flash or switch](docs/SWITCHING.md).
 
 **On Windows:** download `diskOS-Disco-for-Windows.zip` from the release, extract it and run `diskOS-Disco.exe`. It
 checks your PC, flashes the Disc and makes SD updates ([guide](docs/WINDOWS.md)).

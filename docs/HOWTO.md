@@ -238,6 +238,9 @@ stock one. Restart the Disc to return. Your music and settings are safe.
 
 **Sleep timer.** Settings > System > Power > Sleep Timer; When Sleep Ends chooses pause or shut down.
 
+**Going back to stock, reinstalling, trying upstream diskOS?** [Flashing and switching interfaces](SWITCHING.md)
+explains what stays and what goes.
+
 **The Disc starts stock even after installing Disco.** An earlier "Default UI: Stock" choice survives flashing and
 firmware updates (it's kept in the Disc's data area). Hold **Volume Up** while powering on to start Disco once, then
 set Settings > System > Controls > Default UI to **diskOS**. Holding Volume Up at power-on always starts the other

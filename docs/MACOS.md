@@ -6,6 +6,7 @@
 >
 > **Starts stock after installing?** An earlier "Default UI: Stock" choice survives flashing. Hold **Volume Up** while
 > powering on to start Disco once, then set Settings > System > Controls > Default UI to **diskOS**.
+> More: [what stays and what goes when you flash or switch](SWITCHING.md).
 
 Use a Mac, a USB data cable and your own unmodified **FiiO V2.57 firmware ZIP**. Back up your music and keep the installer's saved stock image on separate storage. Allow about 30 uninterrupted minutes.
 
