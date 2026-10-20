@@ -30,7 +30,7 @@ Links always point to releases/latest. No upstream diskOS version shown to users
 ## Major (next feature, after the 2.5.9-t2 crash test)
 - Offline mode (owner, 2026-10-20): Settings > System > Offline mode hides and blocks everything online (Wi-Fi,
   weather, Last.fm, online lyrics/art, auto-tag, Music Assistant, AirPlay, Debug Mode); Bluetooth untouched and
-  available any time. Full plan: docs/plans/offline-mode.md (three open decisions there).
+  available any time. Full plan: docs/plans/offline-mode.md (decided: no Last.fm queue, weather leaves an empty space, name "Offline mode").
 
 ## Major (from the 2.5.8 change specification, not done yet)
 - R02 fully asynchronous queue operations (worker with its own connection, request tokens, one deadline; queue_next /

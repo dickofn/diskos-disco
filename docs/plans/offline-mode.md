@@ -1,6 +1,6 @@
 # Plan: Offline mode
 
-Status: planned (owner, 2026-10-20). To start once the 2.5.9-t2 crash investigation has settled.
+Status: planned and decided (owner, 2026-10-20). To start once the 2.5.9-t2 crash investigation has settled.
 
 ## Goal
 
@@ -31,8 +31,8 @@ Two layers, on purpose:
 | Feature | Navigation | Settings | Behaviour (module guard) | Code |
 |---|---|---|---|---|
 | Wi-Fi | Quick Settings tile hidden | Network > Wi-Fi dimmed: "Offline mode is on" | radio turned off; not started at boot; the keep-alive doesn't restart it; the user's own Wi-Fi on/off choice is remembered for later | wifi.c, quicksettings.c, settings.c, main.c (wifi_supervise) |
-| Weather | hidden on Home and Music; Weather app, menu item and shortcut hidden | "Weather on Home" dimmed | no fetch, timer stopped; an open Weather screen goes back Home | weather.c, apps.c (SC_DEFAULT has weather), disco.c, null_theme.c, simple_theme.c, home widgets |
-| Last.fm | app and menu item hidden | Last.fm settings dimmed | no scrobbling, nothing sent (queue decision below) | lastfm.c, apps.c |
+| Weather | hidden on Home and Music (the space stays empty); Weather app, menu item and shortcut hidden | "Weather on Home" dimmed | no fetch, timer stopped; an open Weather screen goes back Home | weather.c, apps.c (SC_DEFAULT has weather), disco.c, null_theme.c, simple_theme.c, home widgets |
+| Last.fm | app and menu item hidden | Last.fm settings dimmed | no scrobbling: nothing sent and nothing kept for later | lastfm.c, apps.c |
 | Online lyrics | - | "Online lyrics" dimmed | not fetched; lyrics files and embedded lyrics still show | lyrics.c |
 | Online album art | - | "Online album art" dimmed | not fetched; embedded and folder covers still show | netart.c |
 | Auto-tag | - | Playback > Auto-tag dimmed | no lookups | tagfix.c |
@@ -88,12 +88,12 @@ choices are kept and come back when offline mode is turned off.
 - On the Disc: turn on with Wi-Fi on → Wi-Fi off, entries gone; restart → stays offline, Wi-Fi stays off; Bluetooth
   headphones connect and play; turn off → Wi-Fi back as before; Weather/Last.fm work again.
 
-## Open decisions (owner)
+## Decisions (owner, 2026-10-20)
 
-1. **Last.fm while offline:** don't record scrobbles at all (my suggestion: "offline" should mean nothing is kept to
-   send later), or keep queuing them to send when offline mode is turned off?
-2. **Weather on Home:** empty space, or let the layout close the gap (theme by theme)?
-3. **Name:** "Offline mode" (clear) or something softer like "Focus mode"? Offline is clearer about what it does.
+1. **Last.fm while offline: nothing is recorded.** No scrobbles are kept to send later; turning offline mode off
+   starts scrobbling again from that moment.
+2. **Weather on Home and Music: the space stays empty.** Layouts are not rearranged to close the gap.
+3. **Name: "Offline mode".**
 
 ## What it won't do
 
