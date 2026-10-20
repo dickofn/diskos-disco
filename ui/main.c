@@ -3293,6 +3293,7 @@ int main(int argc, char **argv){
         int playing = playstate_playing(&g_ps, st.have_track, st.position_ms, lv_tick_get(), 1600, 0);
         if(playing) g_play_sent_gen = ipc_generation();   /* playback observed this generation (any start, incl. hardware keys): its one-shot is moot */
         queue_tick(&st, playing);
+        crashlog_tick();             /* freeze detector + memory watch (log only) */
         {   /* the player restarted underneath us: worth a line in the crash log (who went down first?) */
             static unsigned seen_gen; unsigned gen = ipc_generation();
             if(seen_gen && gen != seen_gen) crashlog_note("player restarted (connection %u -> %u)", seen_gen, gen);

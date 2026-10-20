@@ -1024,7 +1024,7 @@ int main(int argc, char **argv){
             snprintf(other.path,sizeof other.path,"%s",race_path);
             snprintf(other.album,sizeof other.album,"Other album");
             ipc_seed_state(&other);ui_update(&other);
-            for(int i=0;i<500 && !atomic_load(&race_waiting);i++)usleep(1000);
+            for(int i=0;i<500 && !atomic_load(&race_waiting);i++){ui_art_poll(NULL);usleep(1000);}   /* covers settle before they're decoded */
             assert(atomic_load(&race_waiting));
             ipc_seed_state(&st);ui_update(&st);
             atomic_store(&race_release,1);

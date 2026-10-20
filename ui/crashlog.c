@@ -80,6 +80,7 @@ static void on_crash(int sig, siginfo_t *si, void *ucv){
      * process exactly as before (abort() raises again by itself). The watchdog then does what it always did. */
 }
 static char g_altstack[16384];                            /* a crash from a stack overflow still gets recorded */
+static void mem_read(long *avail, long *total, long *rss);
 void crashlog_install(void){
     stack_t ss = { .ss_sp = g_altstack, .ss_size = sizeof g_altstack, .ss_flags = 0 };
     sigaltstack(&ss, NULL);
@@ -90,7 +91,44 @@ void crashlog_install(void){
     const int sigs[] = { SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT };
     for(unsigned i = 0; i < sizeof sigs / sizeof sigs[0]; i++) sigaction(sigs[i], &sa, NULL);
     struct timespec up; clock_gettime(CLOCK_MONOTONIC, &up);
-    crashlog_note("start v=%s uptime=%ld", DISCO_VERSION, (long)up.tv_sec);
+    long avail = 0, total = 0, rss = 0; mem_read(&avail, &total, &rss);
+    crashlog_note("start v=%s uptime=%ld mem_free=%ldK of %ldK", DISCO_VERSION, (long)up.tv_sec, avail, total);
+}
+/* ---- diagnosis in the main loop (no behaviour change) ----
+ * Freeze detector: the main loop normally comes round every few to 200 ms. A gap over FREEZE_MS means something held
+ * it up; it gets a line (at most one a minute), so stalls before a crash show in the log.
+ * Memory watch: every 5 s, MemAvailable; under LOWMEM_KB a line (at most one a minute) with Disco's own size, because
+ * a kill for lack of memory can't be recorded by Disco itself. */
+#define FREEZE_MS 1500
+#define LOWMEM_KB 12288
+static long mono_ms(void){ struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1000L + t.tv_nsec / 1000000L; }
+static void mem_read(long *avail, long *total, long *rss){
+    FILE *f = fopen("/proc/meminfo", "r"); char line[128]; long freek = -1, cached = 0, buffers = 0;
+    if(f){
+        while(fgets(line, sizeof line, f)){
+            sscanf(line, "MemTotal: %ld", total); sscanf(line, "MemAvailable: %ld", avail);
+            sscanf(line, "MemFree: %ld", &freek); sscanf(line, "Cached: %ld", &cached); sscanf(line, "Buffers: %ld", &buffers);
+        }
+        fclose(f);
+    }
+    if(*avail <= 0 && freek >= 0) *avail = freek + cached + buffers;   /* older kernels have no MemAvailable */
+    f = fopen("/proc/self/statm", "r");
+    if(f){ long size, res; if(fscanf(f, "%ld %ld", &size, &res) == 2) *rss = res * (sysconf(_SC_PAGESIZE) / 1024); fclose(f); }
+}
+void crashlog_tick(void){
+    static long last, last_freeze_note = -60000, last_mem_check, last_mem_note = -60000;
+    long now = mono_ms();
+    if(last && now - last > FREEZE_MS && now - last_freeze_note > 60000){
+        crashlog_note("main loop stalled %ld ms", now - last); last_freeze_note = now;
+    }
+    last = now;
+    if(now - last_mem_check >= 5000){
+        last_mem_check = now;
+        long avail = 0, total = 0, rss = 0; mem_read(&avail, &total, &rss);
+        if(avail > 0 && avail < LOWMEM_KB && now - last_mem_note > 60000){
+            crashlog_note("low memory: %ldK free of %ldK, Disco uses %ldK", avail, total, rss); last_mem_note = now;
+        }
+    }
 }
 void crashlog_note(const char *fmt, ...){
     char msg[300]; va_list ap; va_start(ap, fmt); vsnprintf(msg, sizeof msg, fmt, ap); va_end(ap);

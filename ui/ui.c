@@ -2537,6 +2537,12 @@ static void make_art_key(const track_state_t *st, char *out, int cap)
 }
 
 /* main thread: decide whether art needs (re)decoding and dispatch to the worker */
+#define COVER_SETTLE_MS 300
+static art_req_t g_settle_job; static unsigned g_settle_due; static int g_settle_have;
+static void art_post_job(const art_req_t *jp);
+static void art_settle_tick(void){                     /* the cover timer: post a waiting job once it has settled */
+    if(g_settle_have && (int)(art_clock_ms() - g_settle_due) >= 0){   /* wrap-safe */ g_settle_have = 0; art_post_job(&g_settle_job); }
+}
 static void update_cover_for_path(const track_state_t *st)
 {
     if(strcmp(last_path, st->path) == 0) return;
@@ -2562,7 +2568,7 @@ static void update_cover_for_path(const track_state_t *st)
 
     copy_cstr(last_path, sizeof(last_path), st->path);
 
-    if(!st->path[0]) { art_request_clear(); return; }
+    if(!st->path[0]) { g_settle_have = 0; art_request_clear(); return; }
 
     /* New album/art incoming: hide the now-wrong NP cover and show a loading glyph
      * while the worker decodes, so the previous album's art doesn't masquerade as
@@ -2591,6 +2597,14 @@ static void update_cover_for_path(const track_state_t *st)
     snprintf(job.bout, sizeof job.bout, "/tmp/backdrop%d.bmp", nidx);
     snprintf(job.sharp, sizeof job.sharp, "/tmp/sharp%d.bgra", nidx);
 
+    /* Settle: the song must stay current for COVER_SETTLE_MS before its cover is decoded. During a burst of skips
+     * the songs you fly past start no decode at all (the loading symbol shows at once, as before); a newer song
+     * simply replaces the waiting job. */
+    g_settle_job = job; g_settle_due = art_clock_ms() + COVER_SETTLE_MS; g_settle_have = 1;
+}
+static void art_post_job(const art_req_t *jp)
+{
+    art_req_t job = *jp;
     int launch = 0;
     pthread_mutex_lock(&g_art_mu);
     art_pixels_free(g_art_result.pixels); g_art_result.pixels = NULL; g_art_ready = 0;
@@ -2620,6 +2634,7 @@ static void update_cover_for_path(const track_state_t *st)
 void ui_art_poll(lv_timer_t *t)
 {
     (void)t;
+    art_settle_tick();
     { char got[512];                        /* Online Album Art saved a picture: redo that song's cover if it's on */
       if(netart_take_ready(got, sizeof got) && simple_cfg_get_int("online_art", 0) && strcmp(got, last_path) == 0) ui_art_retry(); }
     int ready = 0, rc = -1, inflight; art_req_t res; unsigned done_req = 0, cur_req = 0;
@@ -3412,7 +3427,11 @@ void ui_history_tick(const track_state_t *st)
     /* count a play once per new track (diskOS play history -> Most-Played / Recently-Played), but
      * only while actually PLAYING (st->state==2). Otherwise a boot-seeded paused track, or skipping
      * through tracks while paused, would inflate play counts + recency for songs never really played. */
-    if(st->state==2 && st->path[0] && strcmp(g_stat_path, st->path) != 0){
+    /* only once a song has really been playing for a moment: songs flown past in a burst of skips aren't written
+     * to the play history (one fewer database write competing with the player's own per skip) */
+    static char seen[256]; static uint32_t seen_at;
+    if(strcmp(seen, st->path)){ copy_cstr(seen, sizeof seen, st->path); seen_at = lv_tick_get(); }
+    if(st->state==2 && st->path[0] && strcmp(g_stat_path, st->path) != 0 && lv_tick_elaps(seen_at) >= 1000){
         copy_cstr(g_stat_path, sizeof g_stat_path, st->path);          /* track identity always (so a music replay after a book still counts) */
         if(!mdb_is_book_path(st->path)) mdb_record_play(st->path);     /* but audiobooks are excluded from play history */
     }

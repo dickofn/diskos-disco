@@ -7,4 +7,5 @@
  * can be traced to a function later, without catching it live over SSH. */
 void crashlog_install(void);                      /* once, early in main(): crash handlers + a start line */
 void crashlog_note(const char *fmt, ...);         /* an ordinary line (not for use inside a signal handler) */
+void crashlog_tick(void);                         /* main loop, every iteration: freeze detector + memory watch */
 #endif
