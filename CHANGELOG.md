@@ -10,7 +10,8 @@ diskOS remains beta software; version numbers do not imply broad hardware or fea
 
 - Fast skipping: on-screen skips paced (one per 0.3 s, up to 8 waiting); covers decoded once a song has been current
   0.3 s; play history counted after 1 s.
-- Bluetooth: no automatic play/pause toggles (they could pause working audio a few seconds in); codec fallback LDAC ->
+- Bluetooth: no automatic play/pause toggles (they could pause working audio a few seconds in); AAC/LDAC switches never
+  hit a playing song (pause, switch, confirmed by BlueALSA, play); codec fallback LDAC ->
   AAC -> SBC; reliable re-routing (same headphones, source changes, songs still starting, failed steps reported);
   search stopped before connecting, Disconnect cancels a pending connection, fast off/on, truthful Forget; stale
   commands dropped after a player restart; connected device found in long lists. AAC/LDAC untested on a Disc.

@@ -358,6 +358,21 @@ static void route_hold_start(const char *mac){
     fprintf(stderr, "route hold: waiting for the codec switch before playing\n"); fflush(stderr);
 }
 void ui_route_hold_cancel(void){ g_hold_since = 0; g_hold_settle = 0; }   /* the user pressed Play/Pause: their call */
+/* When may bt.c send an AAC/LDAC switch? Switching rebuilds the Bluetooth link and FiiO's player stops playback while
+ * it happens, so never under a playing song: 1 = now (nothing playing, or the music is already held for this
+ * device), 0 = wait (a song is still starting). Music playing: pause it first and hold it, so it resumes on the new
+ * codec once BlueALSA confirms it (route_hold_tick). */
+int ui_codec_switch_gate(const char *mac){
+    if(g_hold_since && !strcmp(g_hold_mac, mac)) return 1;
+    if(g_play_pending && lv_tick_elaps(g_play_pending) < 12000) return 0;
+    if(g_playing){
+        if(ipc_send_cmd("0201000C0000") < 0) return 0;                  /* pause (it is playing: position is moving) */
+        route_hold_start(mac);
+        fprintf(stderr, "route hold: paused to switch codec\n"); fflush(stderr);
+        return 1;
+    }
+    return 1;
+}
 static void route_hold_tick(void){
     if(!g_hold_since) return;
     if(strcmp(g_hold_mac, g_route_mac)){ ui_route_hold_cancel(); return; } /* routed elsewhere meanwhile */
@@ -366,12 +381,12 @@ static void route_hold_tick(void){
            || g_hold_path_seq != st.path_seq){ ui_route_hold_cancel(); return; } }
     int pending = bt_codec_upgrade_pending();
     if(pending){
-        if(lv_tick_elaps(g_hold_since) < 8000) return;
-        ui_bt_codec_upgrade_cancel();                                     /* no switch in 8 s: stay on SBC this time */
-        fprintf(stderr, "route hold: no codec switch in 8 s, playing on SBC\n"); fflush(stderr);
+        if(lv_tick_elaps(g_hold_since) < 10000) return;
+        ui_bt_codec_upgrade_cancel();                                     /* no confirmed switch in 10 s: SBC this time */
+        fprintf(stderr, "route hold: no confirmed codec switch in 10 s, playing\n"); fflush(stderr);
     } else {
-        if(!g_hold_settle){ g_hold_settle = lv_tick_get() | 1; return; }  /* switched: let the link settle */
-        if(lv_tick_elaps(g_hold_settle) < 1500) return;
+        if(!g_hold_settle){ g_hold_settle = lv_tick_get() | 1; return; }  /* switch confirmed by BlueALSA: a short settle */
+        if(lv_tick_elaps(g_hold_settle) < 500) return;
     }
     ui_route_hold_cancel();
     if(g_playing){ fprintf(stderr, "route hold: already playing, nothing to do\n"); fflush(stderr); return; }   /* a toggle would PAUSE it */

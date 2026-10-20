@@ -422,7 +422,11 @@ static int bt_probe_run(const char *cmd, char *out, int cap, int timeout_ms){
  * to a device, back to analog, or a lost link) bumps gen; a probe result carries the gen it was started under and is
  * dropped if it is no longer current, so a stale answer can never trigger a codec switch on a later connection. */
 static struct { char mac[18]; int state; /* 0 idle, 1 running, 2 done */ int pcm, known; unsigned avail;
-                int choice, misses, armed, applied; unsigned gen; } g_cq;
+                int choice, misses, armed, applied; unsigned gen;
+                int verifying, want_v, verify_tries; char sel[16]; } g_cq;   /* sel: BlueALSA's "Selected codec" */
+#define BT_VERIFY_TRIES 8      /* after sending: probe ticks (0.7 s apart, ~5.6 s) for BlueALSA to report the codec */
+int ui_codec_switch_gate(const char *mac);   /* main.c: 1 = switch now (nothing playing, or held), 0 = wait */
+static int bt_info_prop(const char *buf, const char *key, char *out, int cap);   /* fwd */
 static pthread_mutex_t g_cq_mu = PTHREAD_MUTEX_INITIALIZER;
 #define BT_PCM_TRIES 20        /* probe ticks (0.7 s apart, ~14 s) to wait for the PCM before giving up (stays on SBC) */
 struct bt_probe_arg { unsigned gen; char mac[18]; };
@@ -432,9 +436,15 @@ static void *bt_codec_probe_thread(void *arg){
     info[0] = 0;
     if(bt_codec_query_cmd(pa->mac, cmd, sizeof cmd) == 0) bt_probe_run(cmd, info, sizeof info, 700);
     int known = 0; unsigned avail = bt_codec_parse_avail(info, &known);
+    char sel[16] = "", v[64];
+    if(bt_info_prop(info, "Selected codec:", v, sizeof v)){          /* first word, upper case: "AAC", "LDAC", "SBC" */
+        int k = 0; while(v[k] && v[k] != ' ' && v[k] != ':' && k < (int)sizeof sel - 1){ sel[k] = (v[k] >= 'a' && v[k] <= 'z') ? (char)(v[k] - 32) : v[k]; k++; }
+        sel[k] = 0;
+    }
     pthread_mutex_lock(&g_cq_mu);
     if(pa->gen == g_cq.gen){                       /* still the route this probe was started for */
         g_cq.pcm = strstr(info, "PCM=") != NULL; g_cq.known = known; g_cq.avail = avail; g_cq.state = 2;
+        snprintf(g_cq.sel, sizeof g_cq.sel, "%s", sel);
     }
     pthread_mutex_unlock(&g_cq_mu);
     free(pa);
@@ -461,6 +471,16 @@ int bt_codec_upgrade_step(void){
     pthread_mutex_lock(&g_cq_mu);
     snprintf(mac, sizeof mac, "%s", g_cq.mac);
     if(!g_cq.armed || strcmp(ui_route_mac(), mac)) done = 1;                 /* cancelled or routed away: forget it */
+    else if(g_cq.verifying && g_cq.state == 2){
+        /* sent: wait for BlueALSA to report the new codec before calling it done (the playback hold waits on this) */
+        const char *want = g_cq.want_v == 1 ? "AAC" : "LDAC";
+        if(!strcmp(g_cq.sel, want)){ done = 1; g_cq.applied = 1;
+            fprintf(stderr, "bt codec: %s confirmed\n", want); fflush(stderr); }
+        else if(++g_cq.verify_tries >= BT_VERIFY_TRIES){ done = 1; g_cq.applied = 1;
+            fprintf(stderr, "bt codec: %s not confirmed (selected '%s'), going on\n", want, g_cq.sel); fflush(stderr); }
+        g_cq.state = 0;
+    }
+    else if(g_cq.verifying){ /* probe still running */ }
     else if(g_cq.state == 2){
         if(g_cq.pcm && g_cq.known){                                      /* the link is there and says what it can do */
             int v = bt_codec_pick(g_cq.choice, g_cq.avail, g_cq.known);  /* unlisted -> SBC = nothing to do */
@@ -475,11 +495,16 @@ int bt_codec_upgrade_step(void){
     if(done) g_cq.armed = 0;
     unsigned gen_now = g_cq.gen;
     pthread_mutex_unlock(&g_cq_mu);
+    if(send > 0 && !ui_codec_switch_gate(mac)){              /* a song is starting: switch once that settles */
+        pthread_mutex_lock(&g_cq_mu); if(g_cq.gen == gen_now) g_cq.state = 0; pthread_mutex_unlock(&g_cq_mu);
+        send = 0;
+    }
     if(send > 0){
         int sent = bt_codec_frame_value(mac, send, f, sizeof f) == 0 && ipc_send_cmd(f) == 0;
         pthread_mutex_lock(&g_cq_mu);
         if(g_cq.gen == gen_now && g_cq.armed){
-            if(sent){ g_cq.armed = 0; g_cq.applied = 1; done = 1; }
+            if(sent){ g_cq.verifying = 1; g_cq.want_v = send; g_cq.verify_tries = 0; g_cq.state = 0; done = 0;
+                      fprintf(stderr, "bt codec: %s requested, waiting for it\n", send == 1 ? "AAC" : "LDAC"); fflush(stderr); }
             else if(++g_cq.misses >= BT_PCM_TRIES){
                 if(send >= 2 && (g_cq.avail & BTC_AAC)){           /* LDAC never got through: try AAC before SBC */
                     g_cq.choice = 1; g_cq.misses = 0;
@@ -489,7 +514,7 @@ int bt_codec_upgrade_step(void){
             /* else: still armed, the next tick probes and tries again */
         }
         pthread_mutex_unlock(&g_cq_mu);
-        if(sent) ui_resume_guard_arm(2, mac);  /* the switch renegotiates the link mid-song: make sure music goes on */
+        /* (no guard here any more: a switch is only sent with nothing playing or under the playback hold) */
     }
     if(spawn){ pthread_t t;
                if(pthread_create(&t, NULL, bt_codec_probe_thread, spawn) == 0) pthread_detach(t);
@@ -506,7 +531,7 @@ int bt_codec_upgrade_pending(void){
 /* Any route change invalidates a pending upgrade and every probe still running for it. */
 void ui_bt_codec_upgrade_cancel(void){
     pthread_mutex_lock(&g_cq_mu);
-    g_cq.gen++; g_cq.armed = 0; g_cq.applied = 0; g_cq.state = 0;
+    g_cq.gen++; g_cq.armed = 0; g_cq.applied = 0; g_cq.state = 0; g_cq.verifying = 0;
     pthread_mutex_unlock(&g_cq_mu);
     /* N01: an AAC/LDAC request still in line goes too - only those (VALUE1 1-4), never the route's own SBC frame
      * (VALUE1 0), which the auto-route poll's routine cancels right after a route must not withdraw */
@@ -523,7 +548,7 @@ void ui_bt_codec_upgrade_arm(const char *mac, int fresh){
     pthread_mutex_lock(&g_cq_mu);
     int same = !strcmp(g_cq.mac, mac) && (g_cq.armed || g_cq.applied);
     if(!fresh && (same || choice == 0)){ pthread_mutex_unlock(&g_cq_mu); return; }
-    g_cq.gen++; g_cq.armed = 0; g_cq.applied = 0; g_cq.state = 0; g_cq.misses = 0;
+    g_cq.gen++; g_cq.armed = 0; g_cq.applied = 0; g_cq.state = 0; g_cq.misses = 0; g_cq.verifying = 0;
     snprintf(g_cq.mac, sizeof g_cq.mac, "%s", mac);
     if(choice > 0){ g_cq.choice = choice; g_cq.armed = 1; }
     pthread_mutex_unlock(&g_cq_mu);

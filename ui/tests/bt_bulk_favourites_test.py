@@ -147,10 +147,10 @@ static const char *norm_mac_for_defer(const char *mac){static char n[20];route_u
 """ + guard + hold + r"""
 static void run(uint32_t until){while(now<until){now+=100;route_hold_tick();}}
 int main(void){
- pending=1;route_hold_start(route);run(7900);assert(sends==0);           /* still switching: music waits */
- run(8300);assert(sends==1 && cancels==1);                              /* no switch in 8 s: SBC, play once */
+ pending=1;route_hold_start(route);run(9900);assert(sends==0);           /* still switching: music waits */
+ run(10300);assert(sends==1 && cancels==1);                             /* no confirmed switch in 10 s: play once */
  sends=0;cancels=0;now=20000;pending=1;route_hold_start(route);run(22000);pending=0;
- run(23400);assert(sends==0);run(23700);assert(sends==1 && !cancels);   /* switched: settle 1.5 s, then play */
+ run(22400);assert(sends==0);run(22800);assert(sends==1 && !cancels);   /* switch confirmed: settle 0.5 s, then play */
  sends=0;now=30000;pending=1;route_hold_start(route);run(31000);ui_route_hold_cancel();pending=0;run(40000);assert(!sends);   /* user pressed Play/Pause */
  now=50000;pending=1;route_hold_start(route);strcpy(g_route_mac,"11:22:33:44:55:66");run(60000);assert(!sends);              /* routed elsewhere */
  /* B03 (2.5.9 Bluetooth audit): the hold belongs to its song and session, and never toggles a playing song */
@@ -167,7 +167,15 @@ int main(void){
  g_play_pending=0;g_playing=1;now=210000;
  assert(ui_route_bt("11:22:33:44:55:66")==0 && arms==1 && g_hold_since);   /* the song plays: routed, held for the codec */
  int before=sends;ui_route_hold_cancel();g_playing=0;(void)before;
- puts("PASS BT route hold: waits for the codec switch, settles 1.5 s, plays once; SBC after 8 s; user and route changes win; another song, another session or music already playing: no toggle; no route while a song is starting");
+ /* gate (2.6.0): an AAC/LDAC switch never hits a playing song */
+ ui_route_hold_cancel(); sends=0; g_playing=0; g_play_pending=0; now=200000;
+ assert(ui_codec_switch_gate(route)==1 && sends==0);                       /* nothing playing: switch now */
+ g_play_pending=now; assert(ui_codec_switch_gate(route)==0 && sends==0);    /* a song starting: wait */
+ g_play_pending=0; g_playing=1;
+ assert(ui_codec_switch_gate(route)==1 && sends==1 && g_hold_since);       /* playing: paused once, held */
+ assert(ui_codec_switch_gate(route)==1 && sends==1);                       /* already held: no second toggle */
+ ui_route_hold_cancel(); g_playing=0; sends=0;
+ puts("PASS BT route hold: waits for the codec switch, settles 0.5 s after the confirmed switch, plays once; plays after 10 s; user and route changes win; another song, another session or music already playing: no toggle; no route while a song is starting; a switch never hits a playing song (pause first, once)");
  return 0;
 }
 """
