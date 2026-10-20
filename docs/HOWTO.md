@@ -116,6 +116,10 @@ songs play after the current one, in the order you added them; then your music c
 use the Queue shortcut. Drag a song by ≡ to move it, tap it to play it now, or tap Clear twice to empty the
 queue.
 
+**Play only the queue.** With nothing playing, add songs or a folder to the queue and tap **Play** on the Queue
+screen (or Play / Next on Music): it starts with the first queued song and plays them in order (in a random order
+when the play mode is Shuffle), then stops.
+
 ## Search
 
 **Find a song or artist.** Pick Search in the navigation circle and tap **Search library**. Type, then press
