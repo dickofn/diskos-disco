@@ -27,6 +27,11 @@ Links always point to releases/latest. No upstream diskOS version shown to users
   of pre-made sizes. Needs a render pass of all themes (wider/taller font overflows clocks-adjacent text, pills,
   buttons, QS, Squash/Null) and a real Disc test (CPU on first draw); not to be released untested.
 
+## Major (next feature, after the 2.5.9-t2 crash test)
+- Offline mode (owner, 2026-10-20): Settings > System > Offline mode hides and blocks everything online (Wi-Fi,
+  weather, Last.fm, online lyrics/art, auto-tag, Music Assistant, AirPlay, Debug Mode); Bluetooth untouched and
+  available any time. Full plan: docs/plans/offline-mode.md (three open decisions there).
+
 ## Major (from the 2.5.8 change specification, not done yet)
 - R02 fully asynchronous queue operations (worker with its own connection, request tokens, one deadline; queue_next /
   queue_jump database stages off the UI thread). 2.5.9 only bounds the wait.
