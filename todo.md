@@ -20,7 +20,8 @@ Links always point to releases/latest. No upstream diskOS version shown to users
   hold). Plus the **delayed-pause report** (21 Oct): P01 the post-route guard never sends a play/pause toggle on a
   stalled position (it could pause working audio ~5-6 s in; now hint only), P02 no Bluetooth route while a song is
   still starting (it armed an unheld codec switch; now deferred a few seconds). Needs a test build on the Disc with
-  Bluetooth headphones before release.
+  Bluetooth headphones before release. Also: **codec fallback order** LDAC (any quality) -> AAC -> SBC
+  (owner, 21 Oct), by what the headphones offer and when the LDAC request never gets through.
 
 ## Waiting on users
 - #13 / Bluetooth LDAC (2.5.8: music waits for the codec switch; no device search during playback): never tested
