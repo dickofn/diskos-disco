@@ -2,6 +2,44 @@
 
 [Back to the README](../README.md) · [How-to](HOWTO.md) · [SD updates](UPDATING.md)
 
+## Quick answers
+
+**I installed Disco, but the Disc still shows FiiO's normal screen.**
+Turn the Disc off. Hold **Volume Up** and turn it on. Disco appears. Then go to
+**Settings > System > Controls > Default UI** and choose **diskOS**. Done: you don't need to install again.
+
+**How do I switch between Disco and FiiO's normal screen?**
+- Just once: turn the Disc off, hold **Volume Up**, turn it on.
+- Always: in Disco, **Settings > System > Controls > Default UI**.
+
+**Will I lose my music?**
+No. Installing, updating or going back never touches your music.
+
+**I reinstalled Disco and my old settings came back. Is that normal?**
+Yes. The Disc remembers them, even when Disco is installed again or removed.
+
+**I updated FiiO's firmware and Disco is gone.**
+That's normal: a FiiO update replaces Disco. Make sure the Disc is on version **V2.57**, then install Disco again.
+Your settings come back.
+
+**Something looks wrong after trying another version (like upstream diskOS).**
+In Disco: **Settings > System > Maintenance > Reset diskOS Settings**. Your music, Wi-Fi, Bluetooth and sound
+settings stay.
+
+**The computer can't find my Disc when installing.**
+Turn the Disc off, hold **Volume Down**, then plug in the cable. The screen stays black; that's normal. Use a
+proper data cable (some cables only charge) and plug it straight into the computer.
+
+**Can I delete the `.diskos` or `diskos-update` folders on my SD card?**
+Yes, it's safe. They're rebuilt or only needed during an update.
+
+**Do I need to keep anything on my computer?**
+Yes: the backup the installer made of your Disc. You need it to go back to FiiO's original system. Don't delete it.
+
+---
+
+## The details
+
 Most surprises around installing, going back to stock or trying upstream diskOS come from one fact: **the Disc keeps
 your data in a separate place that flashing doesn't touch.** This page explains the three places, what each action
 changes, and what to do in the common situations.
