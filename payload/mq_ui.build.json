@@ -1,17 +1,17 @@
 {
   "version": "2.6.0",
-  "revision": "Fast-skipping pacing and cover settle, crash log, hints/How-to update, Bluetooth fixes from three audits (B01-B07, B09 part, P01, P02, N01-N04), codec LDAC -> AAC -> SBC",
+  "revision": "Fast-skipping pacing and cover settle, crash log, hints/How-to update, Bluetooth fixes from three audits (B01-B07, B09 part, P01, P02, N01-N04), codec LDAC -> AAC -> SBC; AAC/LDAC switches gated (never under a playing song) and confirmed before resuming",
   "baseline": "v2.5.9",
-  "source_commit": "9229e4304eae20aff578bdedb0ac2e3ca6739548",
-  "ui_source_sha256": "3cfb7eafce34706ea765064d4c8df064e590d39163f8d14b3afeada092b5c2f1",
+  "source_commit": "6c78e89a75f41b5502d7f9e3b896693f8ff7f5dc",
+  "ui_source_sha256": "ba7b17f3a76575c0b81f2771d0d7b173f458ee3c805df62047b45325f6227c1d",
   "ui_source_hash_recipe": "sorted tracked ui paths: path + NUL + file bytes + NUL",
   "compiler": "Repository prebuilt toolchain-gcc11.2: GCC 11.2.0, musl 1.2.6",
   "abi": "static little-endian MIPS32r2, o32, FP64, NaN2008",
-  "status": "Fast skipping and crash log tested on the owner's Disc (2.5.9-t1/t2). Bluetooth fixes and help texts checked with unit tests and host renders only; AAC/LDAC not tested on a Disc.",
+  "status": "Fast skipping and crash log tested on the owner's Disc; AAC fallback confirmed working on the owner's Disc. Codec-switch gate/confirmation and the other Bluetooth fixes checked with unit tests only; LDAC not tested on a Disc.",
   "binary": {
-    "bytes": 6146920,
-    "sha256": "1291b293d9ff1ec1b03ee2cd8a7e263e9f10b561f29b0016e41661c183d76c9b",
-    "md5": "a22d6ea9d51cbf1136e36aed3d31447f"
+    "bytes": 6147896,
+    "sha256": "baba7bab31adf7949e9cc84afdf375d010def0a010b4fffffba2b6f67b2805a7",
+    "md5": "d9791e68ed6d9573a5098a7eed1f7413"
   },
   "artwork_helper": {
     "bytes": 119424,
