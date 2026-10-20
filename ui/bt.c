@@ -484,7 +484,12 @@ int bt_codec_upgrade_step(void){
     else if(g_cq.state == 2){
         if(g_cq.pcm && g_cq.known){                                      /* the link is there and says what it can do */
             int v = bt_codec_pick(g_cq.choice, g_cq.avail, g_cq.known);  /* unlisted -> SBC = nothing to do */
-            if(v != 0) send = v;                                         /* applied only once the command went out */
+            const char *want = v == 1 ? "AAC" : v >= 2 ? "LDAC" : "";
+            if(v != 0 && !strcmp(g_cq.sel, want)){                       /* already on it: no switch, no pause */
+                done = 1; g_cq.applied = 1;
+                fprintf(stderr, "bt codec: already %s, nothing to switch\n", want); fflush(stderr);
+            }
+            else if(v != 0) send = v;                                    /* applied only once confirmed (verifying) */
             else { done = 1; g_cq.applied = 1; }
         } else if(++g_cq.misses >= BT_PCM_TRIES){ done = 1; g_cq.applied = 1; }   /* no link, or its codecs never known */
         g_cq.state = 0;
