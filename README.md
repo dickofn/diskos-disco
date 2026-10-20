@@ -33,7 +33,7 @@
 ---
 
 > [!CAUTION]
-> **Testing only, as-is, no liability.** This is a hobby project. Flashing rewrites the Disc's root filesystem;
+> **Best-effort hobby project, experimental, as-is, no liability.** Flashing rewrites the Disc's root filesystem;
 > a power cut, a bad cable or an interrupted flash can leave it unbootable. Back up your music and keep the
 > saved stock image somewhere safe before you start. Not affiliated with FiiO, Snowsky or Ingenic.
 

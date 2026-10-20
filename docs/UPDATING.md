@@ -2,6 +2,9 @@
 
 [Back to the README](../README.md) · [Developer workflow](DEV_WORKFLOW.md)
 
+> **Best-effort hobby project, experimental, as-is.** No warranty or liability; not affiliated with FiiO or Snowsky.
+> Back up your music and keep the saved stock image before you install.
+
 **On Windows?** The [Windows app](WINDOWS.md) makes your keys, flashes once and makes signed SD updates for you (its
 Update page does steps 2 to 4 below). This guide is the Linux way, and explains what happens underneath.
 

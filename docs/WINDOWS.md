@@ -2,6 +2,9 @@
 
 [Back to the README](../README.md) · [Tour](DISCO_TOUR.md) · [SD updates](UPDATING.md)
 
+> **Best-effort hobby project, experimental, as-is.** No warranty or liability; not affiliated with FiiO or Snowsky.
+> Back up your music and keep the saved stock image before you install.
+
 > **Used the Windows app before? Set it up again once.** Download the latest Windows app, open it and click
 > **Set up again** on its setup page. Until then, an older app keeps installing the version it was first set up with.
 > From 2.5.9 on, the app also updates itself to the latest release on every start.

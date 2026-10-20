@@ -2,6 +2,9 @@
 
 [Back to the README](../README.md) · [How-to](HOWTO.md) · [SD updates](UPDATING.md)
 
+> **Best-effort hobby project, experimental, as-is.** No warranty or liability; not affiliated with FiiO or Snowsky.
+> Back up your music and keep the saved stock image before you install.
+
 ## Quick answers
 
 **I installed Disco, but the Disc still shows FiiO's normal screen.**
