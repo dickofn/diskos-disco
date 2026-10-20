@@ -12,6 +12,12 @@ Links always point to releases/latest. No upstream diskOS version shown to users
   300 ms, up to 8 waiting), covers decoded after a song is current 0.3 s, play history written after 1 s, hints and
   How-to brought up to date (new pages Queue / picking and Start-up / battery). Becomes the next release once stable.
   Symbol copies of t1 and t2 kept for tracing crash addresses.
+- **On the test branch, not in any build yet:** the updated hints and How-to pages, and the **Bluetooth audit fixes**
+  (2.5.9 Bluetooth audit, 21 Oct): B01 route forgotten when the link is gone, B02 routing only in Playback and
+  forgotten on a source change, B03 codec hold bound to its song/session and never toggling a playing song, B04
+  on/off race (per-bring-up token), B05 close-on-exec capture pipes, B06 failed codec send retried, B07 our own
+  device search stopped before connecting, B09 Forget verifies removal. Tests added (bt_capture, bt_power, route
+  hold). Needs a test build on the Disc with Bluetooth headphones before release.
 
 ## Waiting on users
 - #13 / Bluetooth LDAC (2.5.8: music waits for the codec switch; no device search during playback): never tested
@@ -47,6 +53,10 @@ Links always point to releases/latest. No upstream diskOS version shown to users
   R13 -O2 experiment (measure on the Disc first).
 
 ## Minor
+- From the Bluetooth audit, not done yet: B08 a persistent pairing agent (check on the Disc first whether FiiO's
+  software already provides one; first pairings seem to work); B09 device details/forget off the screen's thread
+  (they can still hold the screen up to 4-5 s); B06 confirm which codec was really selected before releasing the
+  hold; remove the unused legacy bt_codec_apply_async(); ui/tests/transport_test.py no longer builds (stale harness).
 - Korean/CJK in a second, larger size for Music titles (about +0.4 MB per script).
 
 ## Experiments
