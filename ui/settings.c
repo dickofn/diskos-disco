@@ -998,7 +998,7 @@ static const setting_t TABLE[] = {
     { "Network",  "Bluetooth", ST_ACTION, NULL, 0,0,0, NULL,0, LV_SYMBOL_RIGHT, apply_bt, 0,
       "Pair Bluetooth devices. Audio routes to connected headphones or speakers (SBC, beta).", NULL },
     { "Network",  "Bluetooth Codec", ST_CHOICE, "bt_codec", 0,0,0, BT_CODEC_LABEL, BT_CODEC_N, NULL, NULL, 0,
-      "Choose the headphone codec for the next connection. Unsupported codecs fall back to SBC. AAC/LDAC may stutter.", NULL },
+      "Choose the headphone codec for the next connection. If the headphones lack LDAC, AAC is used; SBC only if they lack both. AAC/LDAC may stutter.", NULL },
 };
 #define N_SETTINGS ((int)(sizeof(TABLE)/sizeof(TABLE[0])))
 
@@ -1412,7 +1412,7 @@ void setting_detail_refresh(void){
     const char *desc = s->desc;
     if(s->type==ST_CYCLER && s->opt_descs && v>=0 && v<s->nopts) desc = s->opt_descs[v];
     if(s->type == ST_CHOICE) desc = (s->opts == i18n_lang_names) ? "Screen redraws after selection."
-                                  : (s->cfg_key && !strcmp(s->cfg_key, "bt_codec")) ? "Best effort: SBC if the headphones lack it." : NULL;
+                                  : (s->cfg_key && !strcmp(s->cfg_key, "bt_codec")) ? "Best effort: LDAC falls back to AAC, then SBC." : NULL;
     if(th_null() && s->cfg_key && !strcmp(s->cfg_key,"theme_variant"))desc="Null uses a fixed dark appearance.\nLight/Dark is unavailable in this theme.";
     if(th_null() && s->cfg_key && !strcmp(s->cfg_key,"null_side"))desc="Null is right-handed only. This option is disabled.";
     if(desc && desc[0]){

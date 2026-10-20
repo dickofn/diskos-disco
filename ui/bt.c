@@ -337,12 +337,16 @@ static int bt_codec_frame_value(const char *mac, int v, char *out, int cap);
 #define BTC_AAC  2u
 #define BTC_LDAC 4u
 static unsigned bt_codec_need(int v){ return v == 1 ? BTC_AAC : (v >= 2 && v <= 4) ? BTC_LDAC : 0u; }
-/* The stock VALUE1 to send: the saved choice, or SBC when the sink is known not to offer that codec. */
+/* The stock VALUE1 to send. The saved choice when the sink offers it; any LDAC choice steps down to AAC when the sink
+ * offers AAC but not LDAC; SBC only when neither is offered (or the sink's list is unknown). */
 int bt_codec_pick(int choice, unsigned avail, int avail_known){
     if(choice < 0 || choice >= BT_CODEC_N) return 0;
     unsigned need = bt_codec_need(choice);
-    if(need && !(avail_known && (avail & need))) return 0;   /* offered, or unknown: SBC */
-    return choice;
+    if(!need) return choice;                                  /* SBC chosen */
+    if(!avail_known) return 0;                                /* unknown: SBC */
+    if(avail & need) return choice;                           /* offered as chosen */
+    if(need == BTC_LDAC && (avail & BTC_AAC)) return 1;       /* LDAC not offered: AAC first */
+    return 0;                                                 /* neither: SBC */
 }
 /* Codecs a sink offers, from `bluealsa-cli info <pcm>`: the words on the "Available codecs:" line and on the lines
  * after it that carry no ':'. *known = 0 when that header is missing (unparseable/failed query). */
@@ -468,7 +472,12 @@ int bt_codec_upgrade_step(void){
         pthread_mutex_lock(&g_cq_mu);
         if(g_cq.gen == gen_now && g_cq.armed){
             if(sent){ g_cq.armed = 0; g_cq.applied = 1; done = 1; }
-            else if(++g_cq.misses >= BT_PCM_TRIES){ g_cq.armed = 0; g_cq.applied = 1; done = 1; }   /* gave up: SBC */
+            else if(++g_cq.misses >= BT_PCM_TRIES){
+                if(send >= 2 && (g_cq.avail & BTC_AAC)){           /* LDAC never got through: try AAC before SBC */
+                    g_cq.choice = 1; g_cq.misses = 0;
+                    fprintf(stderr, "bt codec: LDAC request failed, trying AAC\n"); fflush(stderr);
+                } else { g_cq.armed = 0; g_cq.applied = 1; done = 1; }   /* gave up: SBC */
+            }
             /* else: still armed, the next tick probes and tries again */
         }
         pthread_mutex_unlock(&g_cq_mu);
