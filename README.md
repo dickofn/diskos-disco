@@ -37,11 +37,11 @@
 > a power cut, a bad cable or an interrupted flash can leave it unbootable. Back up your music and keep the
 > saved stock image somewhere safe before you start. Not affiliated with FiiO, Snowsky or Ingenic.
 
-## New in 2.6.0
+## New in 2.6.1
 
-**Steadier under pressure:** fast skipping is paced and smoother, **Bluetooth** no longer pauses songs on its own and
-falls back LDAC → AAC → SBC, the help matches today's Disco, and a small crash log helps track down problems.
-Bluetooth AAC/LDAC is not tested yet; reports welcome. [See what’s new](docs/releases/v2.6.0.md).
+**Fixes Bluetooth headphones dropping mid-song** in 2.6.0. 2.6.0 brought smoother fast skipping, a steadier Bluetooth
+with LDAC → AAC → SBC, up-to-date help and a crash log. [See what’s new](docs/releases/v2.6.1.md) ·
+[2.6.0](docs/releases/v2.6.0.md).
 
 ## Big. Bold. Squash.
 

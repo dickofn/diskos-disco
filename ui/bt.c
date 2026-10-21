@@ -658,7 +658,13 @@ static void bt_autoroute_poll_cb(lv_timer_t *t){
     int found = 0;
     /* bounded: bluealsa-cli talks to bluealsa and can stall if it is wedged; this runs on a 3s poll
      * timer (main thread), so a hang here would freeze the UI. No `timeout` binary on the device. */
-    if(run_cap_bounded("bluealsa-cli list-pcms 2>/dev/null | grep -m1 a2dpsrc", path, sizeof path, 250) > 0){
+    /* A probe that TIMED OUT (the Disc busy, or slower with the screen off) knows nothing: it must not count as "the
+     * link is gone". Taking it for that made 2.6.0 forget the route, and the re-route's 06c1 restarts the player's
+     * Bluetooth service - dropping the headphones mid-song. Only a probe that completed and found no A2DP PCM is
+     * evidence. */
+    int got = run_cap_to("bluealsa-cli list-pcms 2>/dev/null | grep -m1 a2dpsrc", path, sizeof path, 250);
+    if(got < 0) return;                                   /* no answer in time: change nothing, ask again next poll */
+    if(got > 0){
         char *dev = strstr(path, "dev_");
         if(dev){
             dev += 4;
@@ -670,12 +676,16 @@ static void bt_autoroute_poll_cb(lv_timer_t *t){
             }
         }
     }
-    /* B01: one empty answer can be a probe hiccup; two in a row (6 s) mean the link is really gone. Then the route
-     * record goes too, so the same headphones coming back get the full routing sequence again, not "already routed". */
+    /* B01: the link is really gone only after THREE completed probes in a row found no A2DP PCM (9 s); then the
+     * route record goes too, so the same headphones coming back get the full routing sequence, not "already routed".
+     * Fewer than that changes nothing at all (not even the latch or a pending codec switch): a single empty answer
+     * during a codec switch or a busy moment must never lead to a re-route. */
     static int missing;
     if(!found){
-        g_bt_autorouted[0] = 0; ui_bt_codec_upgrade_cancel();
-        if(++missing == 2 && ui_route_mac()[0]){ void ui_route_forget(const char *why); ui_route_forget("link gone"); }
+        if(++missing == 3){
+            g_bt_autorouted[0] = 0; ui_bt_codec_upgrade_cancel();
+            if(ui_route_mac()[0]){ void ui_route_forget(const char *why); ui_route_forget("link gone"); }
+        }
         return;
     }
     missing = 0;

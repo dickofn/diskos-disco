@@ -6,6 +6,14 @@ Entries follow the Keep a Changelog format, with Added, Changed, and Fixed categ
 diskOS remains beta software; version numbers do not imply broad hardware or feature validation.
 
 
+## [2.6.1] - 2026-10-21
+
+- Bluetooth: headphones no longer drop mid-song. A late answer from the link check (busy Disc, screen off) is no
+  longer taken for a lost connection; only three real "no link" answers in a row count (2.6.0 re-routed, which
+  restarts the player's Bluetooth service).
+
+[2.6.1 release notes](docs/releases/v2.6.1.md)
+
 ## [2.6.0] - 2026-10-21
 
 - Fast skipping: on-screen skips paced (one per 0.3 s, up to 8 waiting); covers decoded once a song has been current
