@@ -1,17 +1,17 @@
 {
   "version": "2.6.0",
-  "revision": "Fast-skipping pacing and cover settle, crash log, hints/How-to update, Bluetooth fixes from three audits (B01-B07, B09 part, P01, P02, N01-N04), codec LDAC -> AAC -> SBC; AAC/LDAC switches gated (never under a playing song) and confirmed before resuming; no switch when already on the chosen codec",
+  "revision": "Fast-skipping pacing and cover settle, crash log, hints/How-to update, Bluetooth fixes from three audits (B01-B07, B09 part, P01, P02, N01-N04), codec LDAC -> AAC -> SBC; AAC/LDAC switches gated (never under a playing song) and confirmed before resuming; no switch when already on the chosen codec; never stopped on a guess (audio system asked before idle power-off and route/codec actions)",
   "baseline": "v2.5.9",
-  "source_commit": "13226b1ed7fb2ed5537e5e65ab8bbaa179d43d31",
-  "ui_source_sha256": "ff5d3112e1bd2e1ed705708801c78a499987fcdacfa21fdf6ae5c1d67d170160",
+  "source_commit": "68128786951b81ac08b04468db3d42f82c9a1379",
+  "ui_source_sha256": "9c7104b914b9a195a9f48974fb8080ef5a57463e85861c841668e5d17f418185",
   "ui_source_hash_recipe": "sorted tracked ui paths: path + NUL + file bytes + NUL",
   "compiler": "Repository prebuilt toolchain-gcc11.2: GCC 11.2.0, musl 1.2.6",
   "abi": "static little-endian MIPS32r2, o32, FP64, NaN2008",
-  "status": "Fast skipping and crash log tested on the owner's Disc; AAC fallback confirmed working on the owner's Disc. Codec-switch gate/confirmation and the other Bluetooth fixes checked with unit tests only; LDAC not tested on a Disc.",
+  "status": "Covered by bt_autoroute_test (fails on 2.6.0), play_defer_test, audio_running_test, the route-hold test and power_plugged_test. Not yet tested on a Disc.",
   "binary": {
-    "bytes": 6148056,
-    "sha256": "c6df919b386cb0a4883fe72122e7bca2e8f749d83af57e8ed8cabaf129de6ac3",
-    "md5": "df8544c68b58d3ddf5a9542a6d9ae075"
+    "bytes": 6151664,
+    "sha256": "8db1674c4ed95260637af12cefbda4c382f388e0ff978cb0b5287a6b45aca3ce",
+    "md5": "0a13abfd20f6b1d1789fb52066f7c558"
   },
   "artwork_helper": {
     "bytes": 119424,
