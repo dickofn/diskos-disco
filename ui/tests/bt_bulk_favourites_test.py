@@ -167,6 +167,16 @@ int main(void){
  g_play_pending=0;g_playing=1;now=210000;
  assert(ui_route_bt("11:22:33:44:55:66")==0 && arms==1 && g_hold_since);   /* the song plays: routed, held for the codec */
  int before=sends;ui_route_hold_cancel();g_playing=0;(void)before;
+ /* 2.6.1 audit: Next/Previous during the hold - it follows to the new song and plays it once the switch is done */
+ ui_route_hold_cancel(); strcpy(g_route_mac,"AA:BB:CC:DD:EE:FF"); g_playing=0; sends=0; now=150000;
+ strcpy(current.path,"/music/a.flac"); pending=1; route_hold_start(route); run(151000);
+ ui_route_hold_follow(); strcpy(current.path,"/music/b.flac"); current.path_seq++; current.pos_id++;   /* skipped */
+ run(152000); assert(g_hold_since && !sends);                       /* still held, now for the new song */
+ pending=0; run(153000); assert(sends==1 && !g_hold_since);          /* switch done: plays the new song, once */
+ run(158000); strcpy(current.path,"/music/a.flac");                  /* follow window over: back to normal checks */
+ sends=0; pending=1; route_hold_start(route); run(160000);
+ strcpy(current.path,"/music/c.flac"); current.path_seq++; run(161000); assert(!g_hold_since);   /* no skip: cancelled */
+ pending=0; run(165000); assert(!sends); strcpy(current.path,"/music/a.flac");
  /* gate (2.6.0): an AAC/LDAC switch never hits a playing song */
  ui_route_hold_cancel(); sends=0; g_playing=0; g_play_pending=0; now=200000;
  assert(ui_codec_switch_gate(route)==1 && sends==0);                       /* nothing playing: switch now */
@@ -175,7 +185,7 @@ int main(void){
  assert(ui_codec_switch_gate(route)==1 && sends==1 && g_hold_since);       /* playing: paused once, held */
  assert(ui_codec_switch_gate(route)==1 && sends==1);                       /* already held: no second toggle */
  ui_route_hold_cancel(); g_playing=0; sends=0;
- puts("PASS BT route hold: waits for the codec switch, settles 0.5 s after the confirmed switch, plays once; plays after 10 s; user and route changes win; another song, another session or music already playing: no toggle; no route while a song is starting; a switch never hits a playing song (pause first, once)");
+ puts("PASS BT route hold: waits for the codec switch, settles 0.5 s after the confirmed switch, plays once; plays after 10 s; user and route changes win; another song, another session or music already playing: no toggle; no route while a song is starting; a switch never hits a playing song (pause first, once); a skip during the hold follows to the new song");
  return 0;
 }
 """

@@ -358,6 +358,10 @@ static void route_hold_start(const char *mac){
     fprintf(stderr, "route hold: waiting for the codec switch before playing\n"); fflush(stderr);
 }
 void ui_route_hold_cancel(void){ g_hold_since = 0; g_hold_settle = 0; }   /* the user pressed Play/Pause: their call */
+/* Next/Previous during the hold: the hold follows the user to the song they land on instead of ending (ending it
+ * left the music paused on the new song). For a few seconds after the skip, the song identity is re-taken each tick. */
+static uint32_t g_hold_follow_until;
+void ui_route_hold_follow(void){ if(g_hold_since) g_hold_follow_until = (lv_tick_get() + 3000) | 1; }
 /* When may bt.c send an AAC/LDAC switch? Switching rebuilds the Bluetooth link and FiiO's player stops playback while
  * it happens, so never under a playing song: 1 = now (nothing playing, or the music is already held for this
  * device), 0 = wait (a song is still starting). Music playing: pause it first and hold it, so it resumes on the new
@@ -377,8 +381,14 @@ static void route_hold_tick(void){
     if(!g_hold_since) return;
     if(strcmp(g_hold_mac, g_route_mac)){ ui_route_hold_cancel(); return; } /* routed elsewhere meanwhile */
     {   track_state_t st; ipc_get_state(&st);                             /* another song or session: not ours */
-        if(g_hold_gen != ipc_generation() || strcmp(g_hold_path, st.path) || g_hold_pos_id != st.pos_id
-           || g_hold_path_seq != st.path_seq){ ui_route_hold_cancel(); return; } }
+        if(g_hold_follow_until && (int32_t)(lv_tick_get() - g_hold_follow_until) < 0 && g_hold_gen == ipc_generation()){
+            snprintf(g_hold_path, sizeof g_hold_path, "%s", st.path);     /* the user skipped: follow them */
+            g_hold_pos_id = st.pos_id; g_hold_path_seq = st.path_seq;
+        } else {
+            g_hold_follow_until = 0;
+            if(g_hold_gen != ipc_generation() || strcmp(g_hold_path, st.path) || g_hold_pos_id != st.pos_id
+               || g_hold_path_seq != st.path_seq){ ui_route_hold_cancel(); return; }
+        } }
     int pending = bt_codec_upgrade_pending();
     if(pending){
         if(lv_tick_elaps(g_hold_since) < 10000) return;
@@ -481,7 +491,7 @@ int ui_route_analog(void){
     if(st.have_track && st.position_ms > 0) ui_seek_to(st.position_ms);
     if(was_playing) ipc_send_cmd("0201000C0000");       /* play */
     g_route_mac[0] = 0;
-    ui_bt_codec_upgrade_cancel();                       /* a pending codec switch must not outlive this route */
+    ui_bt_codec_upgrade_cancel(); ui_route_hold_cancel(); ui_resume_guard_cancel();   /* nothing of the BT route outlives it */
     fprintf(stderr,"route analog (playing=%d)\n", was_playing); fflush(stderr);
     return 0;
 }
@@ -3307,7 +3317,7 @@ int main(int argc, char **argv){
             /* the fresh player defaults to local/analog output, so our "routed to X" cache is stale: clear it
              * so ui_reapply_audio's local re-init isn't suppressed, then recover the still-connected speaker
              * via the (settle-deferred) auto-route poll. */
-            g_route_mac[0] = 0;
+            ui_route_forget("player restarted");   /* with its codec switch, hold and guard (one place does it all) */
             bt_notify_player_restart();
             ui_reapply_audio();           /* re-send managed audio config (DRE/filter/etc.); the v2.40 local-init
                                            * is NOT here - it's sent from the play path when the player is ready. */
