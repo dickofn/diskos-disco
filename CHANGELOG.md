@@ -10,7 +10,8 @@ diskOS remains beta software; version numbers do not imply broad hardware or fea
 
 - Bluetooth: headphones no longer drop mid-song. A late answer from the link check (busy Disc, screen off) is no
   longer taken for a lost connection; only three real "no link" answers in a row count (2.6.0 re-routed, which
-  restarts the player's Bluetooth service). A skip during the short codec-switch pause no longer leaves the music
+  restarts the player's Bluetooth service). Music started right after connecting waits for the AAC/LDAC switch
+  and starts on it, instead of pausing a few seconds in. A skip during the short codec-switch pause no longer leaves the music
   paused on the new song.
 - Idle power-off no longer switches the Disc off in Bluetooth DAC or any other working mode, or while plugged in or
   charging (#17).

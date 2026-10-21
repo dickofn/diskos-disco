@@ -490,6 +490,10 @@ static int transport_now(const char *cmd)
         if(is_next || is_prev) ui_route_hold_follow();   /* a skip during the codec-switch hold: it follows to the new song */
         else ui_route_hold_cancel();                     /* Play/Pause: the user's call */
     }
+    {   /* headphones just connected: Play waits for the codec switch (a second Play starts at once) */
+        int ui_play_defer_transport(int is_toggle);
+        if(ui_play_defer_transport(!strcmp(cmd, "0201000C0000"))) return 0;
+    }
     if(is_next || is_prev){
         track_state_t st; ipc_get_state(&st);
         if(mdb_is_book_path(st.path)){

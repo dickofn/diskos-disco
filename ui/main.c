@@ -1091,9 +1091,47 @@ static uint32_t g_book_noadopt_until = 0;  /* after an explicit play, don't let 
 static int g_ctx_type=-1, g_q_internal; static char g_ctx_name[380]; static long g_ctx_pid, g_active_pid;
 static lv_obj_t *g_sd_ov;
 void ui_invalidate_play_scope(void){ /* v1.2 always rebuilds; no scope cache to invalidate */ }
+/* ---- Start on the right codec (2.6.1) ----------------------------------------------------------------------------
+ * Right after headphones connect, the AAC/LDAC switch is still to come; switching rebuilds the Bluetooth link, which
+ * stops a playing song. So a play request made in that moment waits: the switch goes ahead with nothing playing,
+ * and the music starts once BlueALSA confirms the codec (or after 10 s, or if the route goes away). A second Play
+ * press starts it at once. Covers every list play (songs, albums, playlists, queue) and Play on a paused song. */
+static struct { int active, running, kind, list_type, pos1, build_idx, q_internal; char name[384]; uint32_t since; } g_dp;
+static int play_waits_for_codec(void){
+    return !g_dp.running && g_route_mac[0] && !g_playing && !g_hold_since && bt_codec_upgrade_pending();
+}
+static void play_defer_note(void){
+    if(!g_dp.active){ g_dp.since = lv_tick_get() | 1; ui_toast("Getting Bluetooth ready...");
+        fprintf(stderr, "play: waiting for the codec switch before starting\n"); fflush(stderr); }
+    g_dp.active = 1;
+}
+static int ui_play_list_ex(int list_type, const char *name, int pos1, int build_idx);
+static void play_defer_tick(void){
+    if(!g_dp.active) return;
+    if(g_route_mac[0] && bt_codec_upgrade_pending() && lv_tick_elaps(g_dp.since) < 10000) return;
+    g_dp.active = 0; g_dp.running = 1;
+    fprintf(stderr, "play: starting now (%s)\n", bt_codec_upgrade_pending() ? "codec switch still pending" : "codec ready"); fflush(stderr);
+    if(g_dp.kind == 1){ int was = g_q_internal; g_q_internal = g_dp.q_internal;
+                        ui_play_list_ex(g_dp.list_type, g_dp.name, g_dp.pos1, g_dp.build_idx); g_q_internal = was; }
+    else ipc_send_cmd("0201000C0000");                         /* Play on a paused song */
+    g_dp.running = 0;
+}
+/* transport: Play pressed while a play waits -> start now; Play on a paused song before the switch -> wait */
+int ui_play_defer_transport(int is_toggle){
+    if(!is_toggle) return 0;
+    if(g_dp.active){ g_dp.since = lv_tick_get() - 10001; play_defer_tick(); return 1; }   /* impatient: go now */
+    if(play_waits_for_codec()){ g_dp.kind = 2; play_defer_note(); return 1; }
+    return 0;
+}
 static int ui_play_list_ex(int list_type, const char *name, int pos1, int build_idx){
     if(modes_output_busy()){ ui_toast("Switching output - try again"); return 0; }   /* an output switch (0666 re-init) is in flight or recovering */
     if(!ui_local_playback_allowed()){ ui_toast("Return to local playback first"); return 0; }
+    if(play_waits_for_codec()){                                /* headphones just connected: switch first, then play */
+        g_dp.kind = 1; g_dp.list_type = list_type; g_dp.pos1 = pos1; g_dp.build_idx = build_idx;
+        g_dp.q_internal = g_q_internal; snprintf(g_dp.name, sizeof g_dp.name, "%s", name ? name : "");
+        play_defer_note();
+        return 1;
+    }
     /* A music list play (not a custom playlist, type 5) makes the stock player build its queue from the
      * UNFILTERED SONG table. If a .m4b hasn't migrated out yet, it would leak into that queue - so ensure
      * migration first, and refuse the play (rather than queue a book) if it still can't complete. */
@@ -3362,6 +3400,7 @@ int main(int argc, char **argv){
         int playing = playstate_playing(&g_ps, st.have_track, st.position_ms, lv_tick_get(), 1600, 0);
         if(playing) g_play_sent_gen = ipc_generation();   /* playback observed this generation (any start, incl. hardware keys): its one-shot is moot */
         queue_tick(&st, playing);
+        play_defer_tick();           /* a play waiting for the codec switch */
         crashlog_tick();             /* freeze detector + memory watch (log only) */
         {   /* the player restarted underneath us: worth a line in the crash log (who went down first?) */
             static unsigned seen_gen; unsigned gen = ipc_generation();
