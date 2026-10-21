@@ -711,6 +711,17 @@ static void bt_reconnect_last(void){
              "T bluetoothctl connect %s && exit; sleep 5; done ) >/dev/null 2>&1 &", mac, mac);
     system(cmd);
 }
+/* Is BlueALSA's A2DP stream running right now? 1 yes, 0 no (answered), -1 unknown (no answer in time, or this
+ * BlueALSA doesn't report it). Evidence that sound is going to the headphones, independent of Disco's own
+ * position-based guess. Spawns a short command: only for rare decisions (shutdown, route, hold end). */
+int bt_audio_running(void){
+    char out[256];
+    int n = run_cap_to("for p in $(bluealsa-cli list-pcms 2>/dev/null | grep a2dpsrc); do bluealsa-cli info \"$p\" 2>/dev/null; done"
+                       " | grep -i -m1 '^ *Running:'", out, sizeof out, 1000);
+    if(n < 0) return -1;
+    if(!n) return -1;                                   /* no "Running:" line: this BlueALSA doesn't say */
+    return strstr(out, "true") || strstr(out, "yes") ? 1 : 0;
+}
 /* A source change (USB DAC, Bluetooth receiving, back to playback...) owns the output: forget the auto-route latch so
  * returning to playback routes to the headphones afresh (B02). */
 void bt_autoroute_reset(void){ g_bt_autorouted[0] = 0; ui_bt_codec_upgrade_cancel(); }

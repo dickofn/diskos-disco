@@ -132,6 +132,7 @@ void ipc_get_state(track_state_t *s){*s=current;}
 int ipc_send_cmd(const char *s){(void)s;sends++;return 0;}
 static void ui_toast(const char *s){(void)s;notices++;}
 int bt_codec_upgrade_pending(void){return pending;}
+static int audio_run=-1; int ui_audio_running(void){return audio_run;}
 void ui_bt_codec_upgrade_cancel(void){pending=0;cancels++;}
 static int arms;
 static int modes_output_busy(void){return 0;}
@@ -177,6 +178,9 @@ int main(void){
  sends=0; pending=1; route_hold_start(route); run(160000);
  strcpy(current.path,"/music/c.flac"); current.path_seq++; run(161000); assert(!g_hold_since);   /* no skip: cancelled */
  pending=0; run(165000); assert(!sends); strcpy(current.path,"/music/a.flac");
+ /* 2.6.1: sound going out though not seen playing - the hold end never toggles it (that would pause it) */
+ ui_route_hold_cancel(); g_playing=0; sends=0; now=170000; pending=1; route_hold_start(route); run(171000);
+ audio_run=1; pending=0; run(173000); assert(!sends && !g_hold_since); audio_run=-1;
  /* gate (2.6.0): an AAC/LDAC switch never hits a playing song */
  ui_route_hold_cancel(); sends=0; g_playing=0; g_play_pending=0; now=200000;
  assert(ui_codec_switch_gate(route)==1 && sends==0);                       /* nothing playing: switch now */

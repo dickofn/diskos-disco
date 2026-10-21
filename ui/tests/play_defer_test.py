@@ -17,6 +17,7 @@ static uint32_t now = 1000; static uint32_t lv_tick_get(void){ return now; } sta
 static char g_route_mac[20] = "AA:BB:CC:DD:EE:FF"; static int g_playing, g_q_internal; static uint32_t g_hold_since;
 static int pending = 1, toggles, plays, last_internal, toasts;
 int bt_codec_upgrade_pending(void){ return pending; }
+static int audio_run = -1; int ui_audio_running(void){ return audio_run; }
 static int ipc_send_cmd(const char *f){ if(!strcmp(f, "0201000C0000")) toggles++; return 0; }
 static void ui_toast(const char *m){ (void)m; toasts++; }
 static int play_waits_for_codec(void);
@@ -46,7 +47,8 @@ int main(void){
     toggles = 0; now = 50000; assert(ui_play_defer_transport(1) == 1 && toggles == 0);   /* Play on a paused song */
     pending = 0; run(50300); assert(toggles == 1);
     g_playing = 1; pending = 1; assert(ui_play_defer_transport(1) == 0);                   /* Pause while playing: untouched */
-    puts("PASS Play on a paused song waits too; Pause is never held back");
+    g_playing = 0; audio_run = 1; assert(ui_audio_running() == 1 && ui_play_defer_transport(1) == 0); audio_run = -1;   /* sound going out: not held */
+    puts("PASS Play on a paused song waits too; Pause is never held back; nothing is held back while sound is going out");
     return 0;
 }
 '''

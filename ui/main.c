@@ -346,6 +346,7 @@ void ui_resume_guard_cancel(void);
 int ui_get_source_mode(void);
 static uint32_t g_play_pending;                          /* defined with the play-initiation state below */
 int bt_codec_upgrade_pending(void);                      /* bt.c: an AAC/LDAC switch is still to come for this route */
+int ui_audio_running(void);                              /* sound really going out: 1 yes, 0 no, -1 can't tell */
 /* Music held back while the codec switches (set by ui_route_bt, released by route_hold_tick or the user). */
 static uint32_t g_hold_since, g_hold_settle; static char g_hold_mac[20];
 static char g_hold_path[256]; static int g_hold_pos_id; static unsigned g_hold_path_seq, g_hold_gen;
@@ -369,8 +370,8 @@ void ui_route_hold_follow(void){ if(g_hold_since) g_hold_follow_until = (lv_tick
 int ui_codec_switch_gate(const char *mac){
     if(g_hold_since && !strcmp(g_hold_mac, mac)) return 1;
     if(g_play_pending && lv_tick_elaps(g_play_pending) < 12000) return 0;
-    if(g_playing){
-        if(ipc_send_cmd("0201000C0000") < 0) return 0;                  /* pause (it is playing: position is moving) */
+    if(g_playing || ui_audio_running() == 1){                            /* playing (seen, or the audio system says so) */
+        if(ipc_send_cmd("0201000C0000") < 0) return 0;                  /* pause first */
         route_hold_start(mac);
         fprintf(stderr, "route hold: paused to switch codec\n"); fflush(stderr);
         return 1;
@@ -399,7 +400,7 @@ static void route_hold_tick(void){
         if(lv_tick_elaps(g_hold_settle) < 500) return;
     }
     ui_route_hold_cancel();
-    if(g_playing){ fprintf(stderr, "route hold: already playing, nothing to do\n"); fflush(stderr); return; }   /* a toggle would PAUSE it */
+    if(g_playing || ui_audio_running() == 1){ fprintf(stderr, "route hold: already playing, nothing to do\n"); fflush(stderr); return; }   /* a toggle would PAUSE it */
     if(ipc_send_cmd("0201000C0000") == 0){ resume_guard_start(1, g_hold_mac, 1); fprintf(stderr, "route hold: playing\n"); fflush(stderr); }
 }
 /* The route is no longer valid (the headphones' link is gone, or the source changed): forget it with everything that
@@ -439,6 +440,10 @@ int ui_route_bt(const char *mac){
     track_state_t st; ipc_get_state(&st);
     int was_playing = g_playing;   /* real play state; raw st.state is unreliable (reports 0 while playing) so
                                     * the old `st.state==1` was false during playback -> pause was SKIPPED */
+    if(!was_playing && ui_audio_running() == 1){             /* sound is going out though position didn't show it yet: */
+        was_playing = 1;                                    /* treat as playing, so the route pauses and resumes it */
+        fprintf(stderr, "route BT: audio running though not seen playing - treating as playing\n"); fflush(stderr);
+    }
     if(was_playing && ipc_send_cmd("0201000C0000") < 0) return -1;   /* pause; abort route if it can't be sent (don't switch output unpaused) */
     /* N02 (Bluetooth findings, 21 Oct): every step is required. A rejected one ends the route: nothing is recorded as
      * routed (the auto-route poll tries again later), the log names the step, and if the music was paused for the
@@ -1091,6 +1096,44 @@ static uint32_t g_book_noadopt_until = 0;  /* after an explicit play, don't let 
 static int g_ctx_type=-1, g_q_internal; static char g_ctx_name[380]; static long g_ctx_pid, g_active_pid;
 static lv_obj_t *g_sd_ov;
 void ui_invalidate_play_scope(void){ /* v1.2 always rebuilds; no scope cache to invalidate */ }
+/* ---- Is sound actually going out? (2.6.1) -----------------------------------------------------------------------
+ * Disco's "playing" is a guess from the song position moving; it can miss real playback (position reports late).
+ * Before any action that would stop or interrupt music because it "isn't playing" - powering off, resetting the
+ * output for a route, a play/pause toggle - ask the audio system as well: the kernel's playback state for the
+ * Disc's own output, and BlueALSA's stream state for Bluetooth. 1 = sound is going out, 0 = not, -1 = can't tell. */
+#ifndef ASOUND_DIR
+#define ASOUND_DIR "/proc/asound"
+#endif
+int ui_alsa_running(void){
+    DIR *d = opendir(ASOUND_DIR); if(!d) return -1;
+    struct dirent *c; int seen = 0, run = 0;
+    while(!run && (c = readdir(d))){
+        if(strncmp(c->d_name, "card", 4) || !(c->d_name[4] >= '0' && c->d_name[4] <= '9')) continue;
+        char cp[512]; snprintf(cp, sizeof cp, ASOUND_DIR "/%s", c->d_name);
+        DIR *cd = opendir(cp); if(!cd) continue;
+        struct dirent *p;
+        while(!run && (p = readdir(cd))){
+            size_t l = strlen(p->d_name);
+            if(strncmp(p->d_name, "pcm", 3) || !l || p->d_name[l-1] != 'p') continue;   /* playback devices only */
+            for(int sub = 0; sub < 8 && !run; sub++){
+                char sp[1024], line[96]; snprintf(sp, sizeof sp, "%s/%s/sub%d/status", cp, p->d_name, sub);
+                FILE *f = fopen(sp, "r"); if(!f) break;
+                seen = 1;
+                while(fgets(line, sizeof line, f)) if(!strncmp(line, "state:", 6) && strstr(line, "RUNNING")){ run = 1; break; }
+                fclose(f);
+            }
+        }
+        closedir(cd);
+    }
+    closedir(d);
+    return run ? 1 : seen ? 0 : -1;
+}
+int bt_audio_running(void);
+int ui_audio_running(void){
+    if(ui_alsa_running() == 1) return 1;
+    if(g_route_mac[0]) return bt_audio_running() == 1 ? 1 : (ui_alsa_running() == 0 ? 0 : -1);
+    return ui_alsa_running();
+}
 /* ---- Start on the right codec (2.6.1) ----------------------------------------------------------------------------
  * Right after headphones connect, the AAC/LDAC switch is still to come; switching rebuilds the Bluetooth link, which
  * stops a playing song. So a play request made in that moment waits: the switch goes ahead with nothing playing,
@@ -1098,7 +1141,8 @@ void ui_invalidate_play_scope(void){ /* v1.2 always rebuilds; no scope cache to 
  * press starts it at once. Covers every list play (songs, albums, playlists, queue) and Play on a paused song. */
 static struct { int active, running, kind, list_type, pos1, build_idx, q_internal; char name[384]; uint32_t since; } g_dp;
 static int play_waits_for_codec(void){
-    return !g_dp.running && g_route_mac[0] && !g_playing && !g_hold_since && bt_codec_upgrade_pending();
+    return !g_dp.running && g_route_mac[0] && !g_playing && !g_hold_since && bt_codec_upgrade_pending()
+        && ui_audio_running() != 1;                              /* music already going out: don't hold anything back */
 }
 static void play_defer_note(void){
     if(!g_dp.active){ g_dp.since = lv_tick_get() | 1; ui_toast("Getting Bluetooth ready...");

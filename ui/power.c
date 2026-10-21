@@ -210,7 +210,13 @@ static void idle_takeover(void){
     if(sps != was) cfg_set_int("stock_power_save", sps);
     if(r == 1) g_take_ok = 1;
 }
-static int idle_request(void){ return power_shutdown_request(); }
+/* Idle power-off fires only when no sound is going out either: Disco's "nothing playing" is a guess from the song
+ * position, and a guess must never switch the Disc off under running music. Refused: the idle period starts again. */
+static int idle_request(void){
+    int ui_audio_running(void);
+    if(ui_audio_running() == 1){ fprintf(stderr, "idle power-off postponed: audio is running\n"); fflush(stderr); return -1; }
+    return power_shutdown_request();
+}
 void power_note_input(void){ g_key_ms = lv_tick_get(); g_have_key = 1; }
 void power_startup_mirror(void){
     if(!power_supported()) return;
