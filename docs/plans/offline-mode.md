@@ -1,6 +1,6 @@
 # Plan: Offline mode
 
-Status: **queued for 2.7.0** (owner, 2026-10-21). Our plan of 2026-10-20 merged with the "Offline mode proposal
+Status: **on hold** (owner, 2026-10-21: not useful enough for its risk). Previously queued for 2.7.0. Our plan of 2026-10-20 merged with the "Offline mode proposal
 against 2.6.1" (21 Oct). Nothing built yet. All choices made.
 
 ## Goal
