@@ -1,104 +1,110 @@
 # Plan: Offline mode
 
-Status: planned and decided (owner, 2026-10-20). To start once the 2.5.9-t2 crash investigation has settled.
+Status: **queued for 2.7.0** (owner, 2026-10-21). Our plan of 2026-10-20 merged with the "Offline mode proposal
+against 2.6.1" (21 Oct). Nothing built yet. Three layout choices are still open (end of this page).
 
 ## Goal
 
 "Offline in spirit": one switch after which **nothing online can be started, even by accident**. It came from a user
-who never used Weather or Last.fm but kept opening them by mistake. So the point is less "radio off" than "the online
-parts are out of the way and can't do anything".
+who never used Weather or Last.fm but kept opening them by mistake. Disco becomes a local music player.
 
-**Bluetooth is not part of it.** It stays visible and can be turned on at any time (headphones, Bluetooth DAC and
-streaming modes all keep working).
+**Bluetooth is not part of it.** Headphones, pairing, codec settings, Bluetooth DAC and BT streaming stay exactly as
+they are; the switch never turns Bluetooth on or off and never disconnects anything. Not an airplane mode.
 
-## The switch
+## Decided
 
-- **Settings > System > Offline mode**, On/Off. Explanation: "Hides Wi-Fi and everything online (weather, Last.fm,
-  online lyrics and art, auto-tag, Music Assistant, AirPlay). Bluetooth stays available."
-- Off by default. A How-to page and a first-use hint are not needed; the Settings explanation is enough.
-- Small status hint while on: the Wi-Fi symbol in the status bar is simply absent (it already is when Wi-Fi is off),
-  no new icon. Revisit if people get confused.
+- **Name:** "Offline mode". One persistent setting (`offline_mode`, default Off).
+- **Last.fm while offline:** nothing is recorded or kept for later. On entering, an already-earned listen from before
+  may be finished once; then no listening is counted until Offline mode is off again. The account and the existing
+  queue are kept; no logout.
+- **Weather on Home and Music:** the space stays empty (layouts are not rearranged).
+- **Two layers:** navigation hides the online things, **and** every online feature refuses to run on its own while
+  offline, so a forgotten entry point still can't go online.
+- **Off restores exactly the previous state:** Wi-Fi back on only if it was on before; every feature returns to its own
+  setting; nothing that was off gets switched on; accounts, saved networks, caches, shortcuts and menu order kept.
 
-## What changes when it's on
+## Engineering rules (from the proposal, agreed)
 
-Two layers, on purpose:
+- **One policy, not changed settings.** A small `network_mode` module owns the switch. Features read "allowed?" from
+  it; their own saved settings (`wifi_on`, online art/lyrics, auto-tag, weather, Last.fm) are never overwritten. Works
+  after a crash, can't lose preferences, no burst of setting writes.
+- **Wi-Fi is set explicitly off, never toggled.** A toggle can turn an already-off radio on. One "set Wi-Fi to X"
+  path; the keep-alive, scans, connects and delayed callbacks all respect "offline" (effective Wi-Fi = saved choice
+  AND not offline). Wi-Fi-specific controls only: never a blanket `rfkill block all`, never touching Bluetooth.
+- **Downloaded things stay usable.** Covers and lyrics already on the Disc keep working; only new downloads stop.
+  (Today the online-art switch controls both fetching and using saved online covers: they must be separated.)
+- **Running work really stops:** weather, art/lyrics downloads, auto-tag lookups, Last.fm sign-in/uploads, Music
+  Assistant and the Debug Mode SSH. Each job carries the policy "epoch"; late results from before the switch are
+  thrown away quietly (not shown as errors). Only Disco's own processes are stopped (no `killall`). A tag rewrite
+  that has already started is allowed to finish safely.
+- **AirPlay / Music Assistant playing when switched on:** that receiver stops and the Disc returns to Playback; music
+  doesn't start by itself. After Offline mode is off, they don't resume on their own (an explicit choice again);
+  their settings are kept.
+- **"Online & cache" is split:** "Online features" (greyed while offline) and "Artwork cache" (local, stays usable),
+  same underlying settings.
+- **Navigation:** hidden entries are filtered where each list is shown, by stable IDs; saved menus, shortcut slots and
+  their order are never rewritten and come back as they were. A central screen guard: no hidden screen opens via a
+  deep link or the Back history; an open Weather/Last.fm screen goes back to a valid one.
+- **Automatic time / time-zone lookup** paused while offline; manual date, time and zone stay available. The Disc's
+  battery-backed clock keeps time (it may drift slightly).
+- **Honest switching:** "Offline mode on" only once Wi-Fi is confirmed off and Disco's online work has stopped. A
+  failure is shown with a retry; networking is never silently turned back on to recover.
+- **SD-card updates, USB DAC/storage, local apps, stats, EQ, lyrics files, Immersive lyrics:** all keep working.
+- Note: Debug Mode SSH needs Wi-Fi, so `disco-push.sh` updates need Offline mode off (SD-card updates still work).
 
-1. **Navigation hides** the online things (menus, shortcuts, Quick Settings, apps, working modes, Home/Music).
-2. **Every online feature also refuses to run** while offline mode is on, in its own module. So an entry point that
-   slipped through (a theme, a deep link, a forgotten shortcut) still can't go online. This second layer is what
-   actually delivers "can't be triggered by accident".
+## What hides, what's disabled
 
-| Feature | Navigation | Settings | Behaviour (module guard) | Code |
-|---|---|---|---|---|
-| Wi-Fi | Quick Settings tile hidden | Network > Wi-Fi dimmed: "Offline mode is on" | radio turned off; not started at boot; the keep-alive doesn't restart it; the user's own Wi-Fi on/off choice is remembered for later | wifi.c, quicksettings.c, settings.c, main.c (wifi_supervise) |
-| Weather | hidden on Home and Music (the space stays empty); Weather app, menu item and shortcut hidden | "Weather on Home" dimmed | no fetch, timer stopped; an open Weather screen goes back Home | weather.c, apps.c (SC_DEFAULT has weather), disco.c, null_theme.c, simple_theme.c, home widgets |
-| Last.fm | app and menu item hidden | Last.fm settings dimmed | no scrobbling: nothing sent and nothing kept for later | lastfm.c, apps.c |
-| Online lyrics | - | "Online lyrics" dimmed | not fetched; lyrics files and embedded lyrics still show | lyrics.c |
-| Online album art | - | "Online album art" dimmed | not fetched; embedded and folder covers still show | netart.c |
-| Auto-tag | - | Playback > Auto-tag dimmed | no lookups | tagfix.c |
-| Music Assistant (Sendspin) | app and menu item hidden | MA settings dimmed | player stopped; doesn't start | ma.c, sendspin.c, disco.c, null_theme.c |
-| AirPlay | hidden in Working modes | - | can't be selected | modes.c |
-| Debug Mode (SSH) | - | dimmed: "Turn off Offline mode first" (it needs Wi-Fi) | refused | debug_ui.c, settings.c |
-| Online & cache page | - | dimmed as a whole | - | settings.c |
-| Bluetooth | **unchanged** | **unchanged** | **unchanged** | - |
+| | While offline |
+|---|---|
+| Weather | hidden everywhere: app, menus, launchers, shortcuts and their pickers, Quick Settings, Home/Music/saver readings, weather hints; no fetching |
+| Last.fm | hidden everywhere: app, settings, shortcuts, sign-in QR, status; no tracking, upload or sign-in |
+| Music Assistant (Sendspin) | hidden from menus/shortcuts; settings disabled; helper and discovery stopped |
+| AirPlay | hidden as a working mode; stopped if active |
+| Wi-Fi | radio off; Network > Wi-Fi disabled with "Unavailable in Offline mode"; saved networks kept |
+| Online lyrics, online art, auto-tag (incl. its Playback setting and manual lookups) | disabled with the reason; local tags, files and song details untouched |
+| Debug Mode SSH, automatic time | unavailable / paused; manual clock and USB recovery stay |
+| Disc Shelf (known online app) | hidden; downloaded music stays in the library |
+| Bluetooth, local music, library, queue, playlists, stats, EQ, local apps, SD updates, USB modes | unchanged |
 
-Clock: unaffected. The Disc has a battery-backed clock that Disco loads at start; internet time only corrects it
-while Wi-Fi is on, so offline the clock just drifts slowly (seconds per week).
+## Not in this version (decided against or later)
 
-## Switching on and off
+- **Early boot hook** to keep Wi-Fi off from the very first second: it means touching the boot scripts ("don't poke
+  the bear"). Disco switches Wi-Fi off early in its own start-up instead, and we say so honestly.
+- **Network labels for third-party apps** (`network=required|optional|none` in app.conf): a good idea, later. This
+  version hides only the known online app.
+- It's a user mode, not a security sandbox: a root-level app that reconfigures radios itself isn't prevented.
 
-- **On:** remember whether Wi-Fi was on; turn Wi-Fi off; stop Music Assistant; cancel weather/lyrics/art/auto-tag work
-  in flight; if an online screen is open (Weather, Last.fm, Music Assistant), go back to Home; refresh menus, Quick
-  Settings and Home so the entries disappear at once.
-- **Off:** turn Wi-Fi back on only if it was on before; every feature returns to its own setting (nothing that was off
-  gets turned on); entries reappear.
-- **At start-up with offline on:** Wi-Fi is not started (even if its own setting says on); Music Assistant doesn't
-  start; no weather or other fetch is scheduled. Bluetooth starts exactly as it does today.
+## Build order (each step its own test build)
 
-## Navigation details per theme
+1. Policy module, explicit Wi-Fi setter, effective-Wi-Fi rule, the Settings switch; Bluetooth verified untouched
+   (headphones, BT DAC, BT streaming) on the Disc.
+2. Stopping running work cleanly: weather, Last.fm, art, lyrics, auto-tag, Music Assistant, Debug Mode; rapid
+   toggles, stale results, a tag rewrite in progress.
+3. The three themes (Disco, Null, Squash): hidden entries, screen guard, Online features / Artwork cache split,
+   disabled rows with the reason. Renders before and after for the owner.
+4. Docs: How-to, tour, release notes.
 
-Hidden entries are filtered where each list is built, through one shared check, so the user's own menu and shortcut
-choices are kept and come back when offline mode is turned off.
+## Release checks
 
-- **Disco:** navigation circle items (Weather, Sendspin, Last.fm via Apps), Shortcuts, Quick Settings Wi-Fi tile, Music
-  screen weather.
-- **Squash:** launcher items, Quick Settings tile, Home weather.
-- **Null:** drawer items (weather, ma), Quick Settings, Home weather.
-- **Ring, Braun, Stone:** Home weather, Quick Settings tile, Apps list.
-- **All:** Apps list (Weather, Last.fm), Working modes (AirPlay), Shortcuts. A shortcut slot whose app is hidden shows
-  nothing (no substitute), and returns when offline mode is off.
+- Music and an existing Bluetooth stream keep playing when switched on; pairing and codec stay accessible.
+- Restart while offline: no Wi-Fi coming back from any path (keep-alive, Quick Settings, scans, Music Assistant, apps).
+- No weather, art/lyrics lookups, tag downloads, scrobble uploads or discovery while offline (watch the processes,
+  not just the screen); no repeated errors after the switch.
+- Weather and Last.fm absent from every theme, menu, shortcut and Quick Settings; no way in via Back or deep links.
+- Saved covers, embedded/sidecar lyrics, stats, EQ and local apps work.
+- Switching off restores preferences, shortcuts and the previous Wi-Fi state; no lost account, cache or duplicate
+  scrobbles; interrupted network playback doesn't resume by itself.
+- SD updates, USB DAC/storage and stock-boot recovery still work.
 
-## Implementation steps
+## Open choices (owner) - suggested answers in brackets
 
-1. `offline_mode()` (config `offline`, default 0) and `net_allowed()` in one small module; on/off transitions.
-2. Module guards first (the layer that matters most): Wi-Fi start and keep-alive, weather, Last.fm, lyrics, netart,
-   tagfix, MA/Sendspin, Debug Mode, AirPlay mode. Each returns early with no side effects.
-3. Navigation filters: menus, shortcuts, Quick Settings, Apps, Working modes, Home/Music weather, in all six themes.
-4. Settings: the Offline mode switch; dimmed rows with "Offline mode is on" (the existing dimmed-row mechanism).
-5. Start-up behaviour; the remembered Wi-Fi state.
-6. Docs: How-to entry, README feature line, release notes, the switching guide ("Offline mode is on" as a reason
-   something is missing).
+1. **Where the switch lives:** Settings > System (our plan) or Settings > Network, first row (proposal)?
+   [Network: that's where people look for anything Wi-Fi.]
+2. **Quick Settings Wi-Fi tile while offline:** hidden (our plan) or greyed with "Unavailable in Offline mode"
+   (proposal)? [Greyed: it explains why Wi-Fi won't turn on, instead of a tile that silently vanished.]
+3. **A Quick Settings action for Offline mode** (optional, assignable like the others)? [Yes, optional.]
 
-## Testing
+(Not a choice: Weather is hidden from Quick Settings and menus; only Home/Music keep the empty space, as decided.)
 
-- Unit test: with offline on, each guarded module refuses (no fetch, no network call, no Wi-Fi start) and has no side
-  effects; turning it off restores the remembered Wi-Fi state and nothing else.
-- Renders, offline on and off, every theme: Home/Music without weather, Quick Settings without Wi-Fi, menus and
-  launchers, Apps, Shortcuts, Working modes, Settings with dimmed rows.
-- On the Disc: turn on with Wi-Fi on → Wi-Fi off, entries gone; restart → stays offline, Wi-Fi stays off; Bluetooth
-  headphones connect and play; turn off → Wi-Fi back as before; Weather/Last.fm work again.
-
-## Decisions (owner, 2026-10-20)
-
-1. **Last.fm while offline: nothing is recorded.** No scrobbles are kept to send later; turning offline mode off
-   starts scrobbling again from that moment.
-2. **Weather on Home and Music: the space stays empty.** Layouts are not rearranged to close the gap.
-3. **Name: "Offline mode".**
-
-## What it won't do
-
-- Save space: the features stay in the one shared program. Saved lyrics and covers on the card stay too.
-- Save battery beyond what Wi-Fi off already saves; the gain is that Wi-Fi reliably stays off.
-- Touch Bluetooth.
-
-Estimate: one to two sessions plus renders, then a test build on the Disc.
+Estimate: moderate. The settings row and hiding are straightforward; stopping running work cleanly and the radio
+need the most care.

@@ -15,11 +15,17 @@ Links always point to releases/latest. No upstream diskOS version shown to users
 - #13 / Bluetooth LDAC (2.5.8: music waits for the codec switch; no device search during playback): never tested
   with LDAC/AAC headphones by us; the reporter to confirm.
 
-## Next feature
-- **Offline mode** (owner, 2026-10-20): Settings > System > Offline mode hides and blocks everything online (Wi-Fi,
-  weather, Last.fm, online lyrics/art, auto-tag, Music Assistant, AirPlay, Debug Mode); Bluetooth untouched and
-  available any time. Decided: nothing kept for Last.fm, the weather space stays empty, name "Offline mode".
-  Plan: `docs/plans/offline-mode.md`.
+## Queued for 2.7.0 (owner, 2026-10-21; build when the owner says)
+- **Offline mode**: our decided plan merged with the 21 Oct proposal. Plan: `docs/plans/offline-mode.md` (decided
+  parts, engineering rules, what hides, build order in 3 test steps, release checks). Bluetooth untouched. Three
+  layout choices still open there (switch location, greyed vs hidden Wi-Fi tile, optional Quick Settings action).
+  No early boot hook, no app network labels in this version.
+- **Signing epoch:** switch the repo's `ui/tools/owner-keys/diskos-sign.sh` to a UTC timestamp to the second
+  (YYYYMMDDHHMMSS; the Disc allows 18 digits). The minutes-since-2026 epoch is refused by Discs that accepted
+  timestamp epochs from older scripts. The owner already uses the fixed copy.
+- **`disco-push.sh` into the repo** (`ui/tools/owner-keys/`): signs with diskos-sign.sh, reads the Disc's accepted
+  epoch first, copies over one SSH connection without deleting anything (the Disc's rm guard silently refuses rm on
+  the card), verifies. Document in UPDATING.md next to the SD-card route.
 
 ## Polish (owner, 2026-10-20)
 - **Shorter README:** move the "New in 2.0 ... 2.5" history to the changelog; keep what Disco is, how to install,
