@@ -19,6 +19,7 @@ void usage_create(lv_obj_t *root);   /* Settings > Battery: the 24-hour usage di
 void usage_refresh(void);
 void usage_tick(int screen_on, int playing);        /* main loop: one sample a minute */
 void usage_note_battery(int pct, int charging);     /* status poll */
+int  usage_charging(void);                           /* battery charging now (charge current > 0) */
 void ui_shutdown_screen(void);   /* the themed "Shutting down" screen (top layer) */
 void ui_shutdown_hide(void);
 void ui_power_off(void);         /* shutdown screen, save, sync, poweroff */

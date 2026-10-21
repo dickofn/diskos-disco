@@ -84,6 +84,7 @@ static void load(void){
 }
 /* from the 3 s status poll */
 void usage_note_battery(int pct, int charging){ if(pct >= 0 && pct <= 100){ g_batt = pct; g_chg = charging; } }
+int usage_charging(void){ return g_chg; }   /* the battery is being charged (positive charge current) */
 /* The status poll that feeds usage_note_battery stops while the screen is off, so on its own the level and the
  * charger state froze there: a charge made with the screen off was never seen (the since-full totals never reset)
  * and screen-off minutes were logged at a stale level. So the recorder reads the gauge itself, once a minute. */

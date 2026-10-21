@@ -3764,7 +3764,12 @@ int main(int argc, char **argv){
             } else if(touch_gate_wake && lifted) touch_gate_wake = 0;
         }
         if(kbinput_active()) last_activity = lv_tick_get();
-        power_tick(last_activity, playing || ma_playing());   /* Sendspin: AirPlay playback the player may not report */   /* AFTER all input is consumed (a pending touch must win the race): SD-safe shutdown, diskOS idle power-off, temperature notice */
+        {   /* Idle power-off (issue #17): only "idle" when playing music locally and nothing is playing. A working mode
+             * other than Playback (USB DAC, Bluetooth DAC, BT streaming, AirPlay, USB storage) is the Disc in use
+             * without a song of its own moving, and a charging Disc is plugged in on purpose: neither powers off. */
+            int busy = playing || ma_playing() || ui_get_source_mode() != 0 || usage_charging();
+            power_tick(last_activity, busy);
+        }   /* Sendspin: AirPlay playback the player may not report */   /* AFTER all input is consumed (a pending touch must win the race): SD-safe shutdown, diskOS idle power-off, temperature notice */
         int in_saver = (screen_current()==SCR_SAVER);
         /* a manual Sleep request ends the moment the panel is woken (we leave SCR_SAVER) */
         if(g_manual_sleep && !in_saver) g_manual_sleep = 0;

@@ -39,7 +39,7 @@
 
 ## New in 2.6.1
 
-**Fixes Bluetooth headphones dropping mid-song** in 2.6.0. 2.6.0 brought smoother fast skipping, a steadier Bluetooth
+**Fixes Bluetooth headphones dropping mid-song**, and the Disc powering off in Bluetooth DAC mode or while charging. 2.6.0 brought smoother fast skipping, a steadier Bluetooth
 with LDAC → AAC → SBC, up-to-date help and a crash log. [See what’s new](docs/releases/v2.6.1.md) ·
 [2.6.0](docs/releases/v2.6.0.md).
 
