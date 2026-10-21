@@ -18,6 +18,7 @@
 #include "braun.h"
 #include <math.h>
 #include <stdint.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -85,6 +86,35 @@ static void load(void){
 /* from the 3 s status poll */
 void usage_note_battery(int pct, int charging){ if(pct >= 0 && pct <= 100){ g_batt = pct; g_chg = charging; } }
 int usage_charging(void){ return g_chg; }   /* the battery is being charged (positive charge current) */
+/* Plugged in: any power source other than the battery reports online=1 (USB, a charger: whatever the kernel calls it,
+ * so no name is assumed). Catches a full battery on the charger, which draws no charge current. Read at most every
+ * 5 s; -1 when the Disc lists no such source (callers then rely on usage_charging()). */
+#ifndef POWER_SUPPLY_DIR
+#define POWER_SUPPLY_DIR "/sys/class/power_supply"
+#endif
+int usage_plugged_in(void){
+    static uint32_t at; static int have, cached = -1;
+    uint32_t now = lv_tick_get();
+    if(have && now - at < 5000u) return cached;
+    have = 1; at = now; cached = -1;
+    DIR *d = opendir(POWER_SUPPLY_DIR); if(!d) return cached;
+    struct dirent *e;
+    while((e = readdir(d))){
+        if(e->d_name[0] == '.') continue;
+        char p[320], v[32] = ""; FILE *f;
+        snprintf(p, sizeof p, POWER_SUPPLY_DIR "/%s/type", e->d_name);
+        if((f = fopen(p, "r"))){ if(!fgets(v, sizeof v, f)) v[0] = 0; fclose(f); }
+        if(!strncmp(v, "Battery", 7)) continue;                    /* the battery itself doesn't count */
+        snprintf(p, sizeof p, POWER_SUPPLY_DIR "/%s/online", e->d_name);
+        if(!(f = fopen(p, "r"))) continue;
+        int on = 0; if(fscanf(f, "%d", &on) != 1) on = -1; fclose(f);
+        if(on < 0) continue;
+        if(cached < 0) cached = 0;                                 /* at least one source tells us */
+        if(on == 1){ cached = 1; break; }
+    }
+    closedir(d);
+    return cached;
+}
 /* The status poll that feeds usage_note_battery stops while the screen is off, so on its own the level and the
  * charger state froze there: a charge made with the screen off was never seen (the since-full totals never reset)
  * and screen-off minutes were logged at a stale level. So the recorder reads the gauge itself, once a minute. */
