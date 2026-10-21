@@ -1,5 +1,5 @@
 {
-  "version": "2.6.0",
+  "version": "2.6.1",
   "revision": "Fast-skipping pacing and cover settle, crash log, hints/How-to update, Bluetooth fixes from three audits (B01-B07, B09 part, P01, P02, N01-N04), codec LDAC -> AAC -> SBC; AAC/LDAC switches gated (never under a playing song) and confirmed before resuming; no switch when already on the chosen codec; never stopped on a guess (audio system asked before idle power-off and route/codec actions)",
   "baseline": "v2.5.9",
   "source_commit": "68128786951b81ac08b04468db3d42f82c9a1379",
