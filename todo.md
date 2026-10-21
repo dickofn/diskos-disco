@@ -17,8 +17,8 @@ Links always point to releases/latest. No upstream diskOS version shown to users
 
 ## Queued for 2.7.0 (owner, 2026-10-21; build when the owner says)
 - **Offline mode**: our decided plan merged with the 21 Oct proposal. Plan: `docs/plans/offline-mode.md` (decided
-  parts, engineering rules, what hides, build order in 3 test steps, release checks). Bluetooth untouched. Three
-  layout choices still open there (switch location, greyed vs hidden Wi-Fi tile, optional Quick Settings action).
+  parts, engineering rules, what hides, build order in 3 test steps, release checks). Bluetooth untouched. All choices
+  made: switch in Settings > Network (first row), greyed Wi-Fi tile while offline, optional Quick Settings action.
   No early boot hook, no app network labels in this version.
 - **Signing epoch:** switch the repo's `ui/tools/owner-keys/diskos-sign.sh` to a UTC timestamp to the second
   (YYYYMMDDHHMMSS; the Disc allows 18 digits). The minutes-since-2026 epoch is refused by Discs that accepted

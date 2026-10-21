@@ -1,7 +1,7 @@
 # Plan: Offline mode
 
 Status: **queued for 2.7.0** (owner, 2026-10-21). Our plan of 2026-10-20 merged with the "Offline mode proposal
-against 2.6.1" (21 Oct). Nothing built yet. Three layout choices are still open (end of this page).
+against 2.6.1" (21 Oct). Nothing built yet. All choices made.
 
 ## Goal
 
@@ -14,6 +14,12 @@ they are; the switch never turns Bluetooth on or off and never disconnects anyth
 ## Decided
 
 - **Name:** "Offline mode". One persistent setting (`offline_mode`, default Off).
+- **Where:** Settings > Network, first row, the same in every theme. Explanation: "Wi-Fi off. Bluetooth stays
+  available. Online features are paused." Confirmations: "Offline mode on" / "Offline mode off".
+- **Quick Settings Wi-Fi tile while offline:** greyed; it can't switch the radio on and says "Unavailable in Offline
+  mode". Holding it points to the Offline mode setting instead of opening a Wi-Fi scan.
+- **Quick Settings action:** an optional, assignable "Offline mode" action, like the other tiles. No new icon forced
+  anywhere, nothing added to the Music screen.
 - **Last.fm while offline:** nothing is recorded or kept for later. On entering, an already-earned listen from before
   may be finished once; then no listening is counted until Offline mode is off again. The account and the existing
   queue are kept; no logout.
@@ -60,7 +66,7 @@ they are; the switch never turns Bluetooth on or off and never disconnects anyth
 | Last.fm | hidden everywhere: app, settings, shortcuts, sign-in QR, status; no tracking, upload or sign-in |
 | Music Assistant (Sendspin) | hidden from menus/shortcuts; settings disabled; helper and discovery stopped |
 | AirPlay | hidden as a working mode; stopped if active |
-| Wi-Fi | radio off; Network > Wi-Fi disabled with "Unavailable in Offline mode"; saved networks kept |
+| Wi-Fi | radio off; Network > Wi-Fi disabled and the Quick Settings tile greyed, both saying "Unavailable in Offline mode"; saved networks kept |
 | Online lyrics, online art, auto-tag (incl. its Playback setting and manual lookups) | disabled with the reason; local tags, files and song details untouched |
 | Debug Mode SSH, automatic time | unavailable / paused; manual clock and USB recovery stay |
 | Disc Shelf (known online app) | hidden; downloaded music stays in the library |
@@ -96,15 +102,7 @@ they are; the switch never turns Bluetooth on or off and never disconnects anyth
   scrobbles; interrupted network playback doesn't resume by itself.
 - SD updates, USB DAC/storage and stock-boot recovery still work.
 
-## Open choices (owner) - suggested answers in brackets
-
-1. **Where the switch lives:** Settings > System (our plan) or Settings > Network, first row (proposal)?
-   [Network: that's where people look for anything Wi-Fi.]
-2. **Quick Settings Wi-Fi tile while offline:** hidden (our plan) or greyed with "Unavailable in Offline mode"
-   (proposal)? [Greyed: it explains why Wi-Fi won't turn on, instead of a tile that silently vanished.]
-3. **A Quick Settings action for Offline mode** (optional, assignable like the others)? [Yes, optional.]
-
-(Not a choice: Weather is hidden from Quick Settings and menus; only Home/Music keep the empty space, as decided.)
+Decisions recorded 2026-10-21 (switch in Network, greyed Wi-Fi tile, optional Quick Settings action).
 
 Estimate: moderate. The settings row and hiding are straightforward; stopping running work cleanly and the radio
 need the most care.
