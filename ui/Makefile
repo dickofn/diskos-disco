@@ -20,7 +20,7 @@ REPRO_FLAGS := -ffile-prefix-map=$(APP)/= -ffile-prefix-map=$(LVGL)/=lvgl/
 FP_FLAGS := -ffp-contract=off
 CFLAGS := -Os -pipe -std=gnu11 -static -pthread -D_GNU_SOURCE -DLV_CONF_INCLUDE_SIMPLE \
   -ffunction-sections -fdata-sections \
-  -I$(APP) -I$(NUI) -Wall -MMD -MP $(REPRO_FLAGS) $(FP_FLAGS)
+  -I$(APP) -I$(NUI) -I$(APP)/vendor/libsmb2/include -Wall -MMD -MP $(REPRO_FLAGS) $(FP_FLAGS)
 # Device-test builds only: make clean && make EXTRA_CFLAGS=-DDISKOS_TEST_OUTPUTS (shows SPDIF Output + USB Audio)
 CFLAGS += $(EXTRA_CFLAGS)
 # --gc-sections drops every provably-unreferenced function/data section at link (unused LVGL fonts,
@@ -30,7 +30,7 @@ LDLIBS  := -lm -lrt
 
 LVGL_SRCS := $(sort $(shell find $(LVGL)/src -name "*.c"))   # sorted: find order depends on the disk, link order must not
 APP_SRCS  := $(APP)/font_simple_nunito_28.c $(APP)/font_simple_nunito_32.c $(APP)/font_simple_nunito_38.c  $(APP)/font_simple_icons_36.c  $(APP)/font_simple_icons_80.c  $(APP)/font_simple_nunito_26.c $(APP)/font_simple_nunito_36.c  $(APP)/simple_theme.c  $(APP)/null_theme.c $(APP)/null_menu.c $(APP)/null_transport_icons.c $(APP)/font_null.c $(APP)/font_null_music.c $(APP)/font_null_jersey.c $(APP)/battery.c $(APP)/eqpreset.c $(APP)/eqprofile.c $(APP)/main.c $(APP)/sdio.c $(APP)/font_cjk_extra_16.c $(APP)/playstate.c $(APP)/fb_pan.c $(APP)/ipc.c $(APP)/ui.c $(APP)/art.c $(APP)/screenmgr.c $(APP)/home.c $(APP)/home_shortcuts.c $(APP)/library.c $(APP)/musicdb.c $(APP)/settings.c $(APP)/power.c $(APP)/controls.c $(APP)/config.c $(APP)/anim.c $(APP)/search.c $(APP)/saver.c $(APP)/quicksettings.c $(APP)/songinfo.c $(APP)/npmenus.c $(APP)/eqcustom.c $(APP)/apps.c $(APP)/menu_apps.c $(APP)/appshelf.c $(APP)/sphere_ui.c $(APP)/songsphere/sphere.c $(APP)/songsphere/ssdb.c $(APP)/stats.c $(APP)/kbinput.c $(APP)/playlistview.c $(APP)/folderbrowser.c $(APP)/multipick.c $(APP)/crashlog.c $(APP)/books.c $(APP)/upnext.c $(APP)/datetime.c $(APP)/i18n.c $(APP)/i18n_tables.c $(APP)/theme.c $(APP)/theme_kit.c $(APP)/theme_defs.c $(APP)/font_hifi_ui_24.c $(APP)/theme_kits.c $(APP)/theme_validate.c $(APP)/theme_store.c $(APP)/artcache.c $(APP)/colorpick.c $(APP)/albumwall.c $(APP)/debug_ui.c $(APP)/modes.c $(APP)/ma.c $(APP)/roulette.c $(APP)/roulette_spin.c $(APP)/roulette_backend.c $(APP)/azjump.c $(APP)/sendspin.c $(APP)/wifi.c $(APP)/bt.c $(APP)/weather.c $(APP)/lyrics.c $(APP)/netart.c $(APP)/toast.c $(APP)/lastfm.c $(APP)/lastfm_ui.c $(APP)/splash.c $(APP)/md5.c $(APP)/scanner.c $(APP)/system.c $(APP)/ota.c $(APP)/fwcaps.c $(APP)/eqrate.c $(APP)/command_spawn.c $(APP)/ui_instance.c $(APP)/font_icons_28.c $(APP)/font_icons_20.c $(APP)/font_weather16.c $(APP)/font_weather20.c $(APP)/font_intl_14.c $(APP)/font_intl_16.c $(APP)/font_intl_18.c $(APP)/font_intl_20.c $(APP)/font_thai_14.c $(APP)/font_thai_16.c $(APP)/font_thai_18.c $(APP)/font_thai_20.c $(APP)/font_viet_14.c $(APP)/font_viet_16.c $(APP)/font_viet_18.c $(APP)/font_viet_20.c $(APP)/font_kr_16.c $(APP)/font_mono_14.c $(APP)/font_mono_16.c $(APP)/font_mono_18.c $(APP)/font_mono_20.c $(APP)/font_mono_24.c $(APP)/font_mono_bold_12.c $(APP)/font_dot_18.c $(APP)/font_dot_28.c $(APP)/font_stone_clk_64.c $(APP)/font_stone_ui_12.c $(APP)/font_stone_ui_14.c $(APP)/font_stone_ui_16.c $(APP)/font_stone_ui_18.c $(APP)/font_stone_ui_20.c $(APP)/font_stone_ui_24.c $(APP)/font_splash_light_26.c $(APP)/font_splash_bold_26.c $(APP)/font_splash_disco_72.c $(APP)/orbit.c $(APP)/tagfix.c $(APP)/vlist.c $(APP)/fileops.c $(APP)/usage.c $(APP)/queue.c $(APP)/braun.c $(APP)/braun_home.c $(APP)/braun_saver.c $(APP)/disco_saver.c $(APP)/disco.c $(APP)/onboarding.c $(APP)/disco_home.c $(APP)/font_inter_medium_12.c $(APP)/font_inter_medium_14.c $(APP)/font_inter_medium_16.c $(APP)/font_inter_bold_16.c $(APP)/font_inter_bold_18.c $(APP)/font_inter_bold_22.c $(APP)/font_inter_bold_44.c $(APP)/font_inter_medium_20.c $(APP)/songmenu.c $(APP)/curvelist.c $(APP)/imm_record.c $(APP)/artdec_inproc.c $(APP)/font_theme_20.c $(APP)/font_theme_24.c $(APP)/npfont.c $(APP)/font_squash_inter_28.c $(APP)/font_squash_inter_32.c $(APP)/font_squash_inter_36.c $(APP)/font_np_inter_30.c $(APP)/font_np_inter_22.c $(APP)/font_np_nunito_30.c $(APP)/font_np_nunito_22.c
-APP_SRCS += $(APP)/discshelf/ui.c $(APP)/discshelf/landing.c $(APP)/discshelf/style.c $(APP)/discshelf/setup.c $(APP)/discshelf/lifecycle.c $(APP)/discshelf/engine.c $(APP)/discshelf/net.c $(APP)/discshelf/json.c
+APP_SRCS += $(APP)/discshelf/ui.c $(APP)/discshelf/landing.c $(APP)/discshelf/style.c $(APP)/discshelf/setup.c $(APP)/discshelf/lifecycle.c $(APP)/discshelf/engine.c $(APP)/discshelf/net.c $(APP)/discshelf/json.c $(APP)/discshelf/connection.c $(APP)/discshelf/smb.c
 # bundled SQLite amalgamation (compiled in-process; replaces popen sqlite3 CLI)
 SQLITE_FLAGS := -Os -pipe -static -ffunction-sections -fdata-sections -DSQLITE_THREADSAFE=1 -DSQLITE_OMIT_LOAD_EXTENSION \
   -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_DQS=0 -DSQLITE_OMIT_DEPRECATED $(REPRO_FLAGS) $(FP_FLAGS)
@@ -39,7 +39,7 @@ SQLITE_FLAGS := -Os -pipe -static -ffunction-sections -fdata-sections -DSQLITE_T
 BOOM_OBJS := $(APP)/boomshine/main.o $(APP)/boomshine/game.o
 BOOM_FLAGS := -O2 -pipe -std=c11 -static -Wall -Wextra -ffunction-sections -fdata-sections -DBOOMSHINE_BUILTIN \
   -Dmain=boomshine_main $(REPRO_FLAGS) $(FP_FLAGS)
-OBJS := $(LVGL_SRCS:.c=.o) $(APP_SRCS:.c=.o) $(APP)/sqlite3.o $(BOOM_OBJS)
+OBJS := $(LVGL_SRCS:.c=.o) $(APP_SRCS:.c=.o) $(APP)/sqlite3.o $(BOOM_OBJS) $(APP)/vendor/smb-build/libsmb2.a
 
 # Every on-screen colour is a theme role (theme.h); theme.c is the only place RGB becomes a colour. The link fails if
 # any other app source (.c, or any header in the tree) builds a colour itself: an LVGL colour constructor, palette,
@@ -117,7 +117,7 @@ $(APP)/boomshine/%.o: $(APP)/boomshine/%.c $(APP)/boomshine/game.h $(APP)/boomsh
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) mq_ui mq_ui.debug mq_ui.manifest ipodos-ui diskos-bootprobe diskos-artdec
--include $(OBJS:.o=.d)
+-include $(patsubst %.o,%.d,$(filter %.o,$(OBJS)))
 
 # Native render/action diagnostics. Explicitly separate from the production theme/cross-build gates.
 # Run with CROSS=; never stage this host executable into a device payload.
@@ -146,3 +146,6 @@ host-render: $(HOST_OBJS)
 	$(CC) $(LDFLAGS) -o $(HOST_DIR)/host-render $(HOST_OBJS) $(LDLIBS) -lcrypt -Wl,--wrap=ui_seek_to,--wrap=ui_set_volume,--wrap=ui_display_is_off,--wrap=ipc_get_state,--wrap=ui_is_playing,--wrap=ui_transport_command,--wrap=ipc_send_cmd,--wrap=fw_custom_peq_writable,--wrap=fw_custom_peq_curve_writable,--wrap=mdb_get_peq_ex,--wrap=mdb_get_peq_readonly,--wrap=mdb_song_accent,--wrap=art_make_all_ex_gen,--wrap=wifi_radio_live,--wrap=bt_state,--wrap=wifi_toggle,--wrap=bt_toggle,--wrap=artcache_get_thumb,--wrap=artcache_get_cover
 .PHONY: host-render
 -include $(HOST_DIR)/*.d
+
+$(APP)/vendor/smb-build/libsmb2.a: $(wildcard $(APP)/vendor/libsmb2/lib/*.c) $(wildcard $(APP)/vendor/libsmb2/include/smb2/*.h) $(APP)/tools/build_smb.py
+	python3 $(APP)/tools/build_smb.py --cc '$(CC)' --flags '$(REPRO_FLAGS) $(FP_FLAGS)' --out $(APP)/vendor/smb-build

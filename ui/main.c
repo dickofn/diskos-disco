@@ -1756,7 +1756,7 @@ void app_launch(const char *exec){
         boomshine_landing();
         return;
     }
-    if(!strcmp(exec, APP_BUILTIN_SHELF)){discshelf_open();return;}
+    if(!strcmp(exec, APP_BUILTIN_SHELF)){discshelf_landing();return;}
     if(!strcmp(exec, APP_BUILTIN_SPHERE)){ sphere_ui_open(); return; }   /* built in: a screen of mq_ui */
     if(!strcmp(exec, APP_BUILTIN_STATS)){
         stats_landing();

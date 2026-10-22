@@ -7,7 +7,7 @@
 #define PICKS 256
 #define STR 512
 #define IDLEN 160
-enum { HOME, ARTISTS, ALBUMS, TRACKS, ARTIST_ALBUMS };
+enum { HOME, ARTISTS, ALBUMS, TRACKS, ARTIST_ALBUMS, SMB_DIR, SMB_FILE, SMB_BROWSER };
 typedef struct {
   int kind, track, disc, count, local;
   int64_t size;
@@ -54,3 +54,6 @@ void ds_backend_stop(void);
 int ds_backend_collect(void);
 int ds_backend_active(void);
 int ds_fetch_entry(int argc, char **argv);
+
+#include "connection.h"
+void *ds_smb_worker(void*);

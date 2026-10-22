@@ -1,0 +1,15 @@
+# Native Disc Shelf source choice. Configure passwords using Server in the UI.
+source=navidrome
+server=https://music.example.invalid
+username=
+remember_password=0
+download_dir=/tmp/sdcard/Navidrome
+# Only used when source=smb. SMB3 encryption is required.
+smb_server=192.168.1.10
+smb_share=Music
+smb_username=
+smb_domain=
+smb_remember_password=0
+smb_download_dir=/tmp/sdcard/SMB
+# Remembered passwords, if explicitly enabled, are readable by root.
+# No password values are supplied in release examples.

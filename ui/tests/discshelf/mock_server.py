@@ -1,4 +1,4 @@
-import http.server,json,urllib.parse,sqlite3,os,tempfile,subprocess,threading,pathlib
+import hashlib,http.server,json,urllib.parse,sqlite3,os,tempfile,subprocess,threading,pathlib
 root=pathlib.Path(tempfile.mkdtemp(prefix='shelf-test-'))
 local=root/'library.db';con=sqlite3.connect(local);con.execute('CREATE TABLE SONG(TITLE,ARTIST,ALBUM,PATH,ALBUM_ARTIST)');existing=root/'existing.flac';existing.write_bytes(b'fLaC'+b'\0'*124);con.execute('INSERT INTO SONG VALUES(?,?,?,?,?)',('Existing','Guest Artist','Album One',str(existing),'Artist'));con.commit();con.close()
 requests=[]
@@ -7,7 +7,7 @@ def track(n,j):return dict(id=f't{n}{j}',title='Existing' if n==1 and j==0 else 
 class Handler(http.server.BaseHTTPRequestHandler):
  def log_message(self,*args):pass
  def do_GET(self):
-  q=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query);ep=self.path.split('/')[-1].split('.')[0];requests.append((ep,q.get('id',[''])[0]));data={'status':'ok'}
+  q=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query);assert 'p' not in q and q['t'][0]==hashlib.md5(('password'+q['s'][0]).encode()).hexdigest();ep=self.path.split('/')[-1].split('.')[0];requests.append((ep,q.get('id',[''])[0]));data={'status':'ok'}
   if ep=='getArtists':data['artists']={'index':[{'name':'A','artist':[dict(id='artist1',name='Artist',albumCount=2)]}]}
   elif ep=='getAlbumList2':data['albumList2']={'album':[album(1),album(2)] if int(q.get('offset',['0'])[0])==0 else []}
   elif ep=='getArtist':data['artist']=dict(id='artist1',name='Artist',album=[album(1),album(2)])

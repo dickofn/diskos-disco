@@ -28,5 +28,5 @@ with tempfile.TemporaryDirectory() as d:
  p=Path(d);(p/'t.c').write_text(c);sqlite=ui/'sqlite3.o'
  if not sqlite.is_file():
   sqlite=p/'sqlite.o';subprocess.run(['cc','-O0','-DSQLITE_THREADSAFE=1','-DSQLITE_OMIT_LOAD_EXTENSION','-c',str(ui/'sqlite3.c'),'-o',str(sqlite)],check=True)
- subprocess.run(['cc','-g','-std=gnu11','-pthread','-fsanitize=address,undefined','-I'+str(ui),str(p/'t.c'),*[str(ui/'discshelf'/f) for f in ['engine.c','net.c','json.c','lifecycle.c']],str(sqlite),'-lm','-ldl','-o',str(p/'t')],check=True)
+ subprocess.run(['cc','-g','-std=gnu11','-pthread','-fsanitize=address,undefined','-I'+str(ui),'-I'+str(ui/'vendor/libsmb2/include'),str(p/'t.c'),*[str(ui/'discshelf'/f) for f in ['engine.c','net.c','json.c','lifecycle.c','smb.c','connection.c']],str(ui/'md5.c'),str(sqlite),str(ui/'vendor/smb-build/libsmb2.a'),'-lm','-ldl','-o',str(p/'t')],check=True)
  subprocess.run([str(p/'t')],check=True,env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0'))

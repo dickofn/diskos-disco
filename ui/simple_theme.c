@@ -339,11 +339,11 @@ static void simple_style(lv_obj_t*o,kit_role_t role){
 static void simple_back(lv_event_t*e){if(lv_event_get_code(e)==LV_EVENT_CLICKED)screen_back();}
 static lv_obj_t*simple_header(lv_obj_t*r,const char*t,lv_event_cb_t cb){
  const char*shown=!strcmp(t,"Disco Options")?"Squash":!strcmp(t,"Disco Colours")?"Colours":!strcmp(t,"Disco Layout")?"Layout":t;
- lv_obj_t*b=circle(r,92,44,36);lv_obj_set_ext_click_area(b,6);lv_obj_t*back_icon=label(b,LV_SYMBOL_LEFT,0,0,36,TF(UI_20),TC(ACCENT_PRIMARY));lv_obj_center(back_icon);
+ lv_obj_t*b=circle(r,96,44,36);lv_obj_set_ext_click_area(b,6);lv_obj_t*back_icon=label(b,LV_SYMBOL_LEFT,0,0,36,TF(UI_20),TC(ACCENT_PRIMARY));lv_obj_center(back_icon);
  ui_on(b,cb?cb:simple_back,LV_EVENT_CLICKED,NULL,"nav.back",UI_CORE);
  lv_point_t size;const lv_font_t*f=TF(HEADER);lv_text_get_size(&size,shown,f,0,0,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
  if(size.x>152){f=TF(UI_22);lv_text_get_size(&size,shown,f,0,0,LV_COORD_MAX,LV_TEXT_FLAG_NONE);if(size.x>152)f=TF(UI_20);}
- lv_obj_t*l=label(r,shown,116,30,160,f,TC(ACCENT_PRIMARY));lv_obj_set_height(l,40);lv_label_set_long_mode(l,LV_LABEL_LONG_DOT);return l;
+ lv_obj_t*l=label(r,shown,120,44-lv_font_get_line_height(f)/2,156,f,TC(ACCENT_PRIMARY));lv_obj_set_height(l,40);lv_label_set_long_mode(l,LV_LABEL_LONG_DOT);return l;
 }
 const theme_kit_t theme_kit_simple={.id="squash",.style=simple_style,.header=simple_header};
 

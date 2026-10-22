@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #define _GNU_SOURCE
 #include "shelf.h"
+#include "connection.h"
+#include "md5.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -87,15 +89,14 @@ int ds_api_fetch(const char *endpoint, const char *args, const char *path,
               int64_t max, int64_t expected, int media) {
   if (atomic_load(&ds_stopping) || atomic_load(&ds_abort_job) || !shelf_sd_ready())
     return 0;
-  char u[800], p[800], url[4096];
-  ds_url_encode(ds_username, u, sizeof u);
-  ds_url_encode(ds_password, p, sizeof p);
-  if (!u[0])
-    return 0;
-  int len = snprintf(
-      url, sizeof url,
-      "%s/rest/%s.view?u=%s&p=%s&v=1.16.1&c=DiscShelf&f=json%s%s", ds_server,
-      endpoint, u, p, args && *args ? "&" : "", args ? args : "");
+  char u[800],salt[33],token[33],secret[290],url[4096];unsigned char random[16];
+  ds_url_encode(ds_username,u,sizeof u);if(!u[0])return 0;
+  int rng=open("/dev/urandom",O_RDONLY|O_CLOEXEC);size_t used=0;
+  if(rng<0)return 0;while(used<sizeof random){ssize_t got=read(rng,random+used,sizeof random-used);if(got<0&&errno==EINTR)continue;if(got<=0)break;used+=got;}close(rng);
+  if(used!=sizeof random)return 0;
+  for(size_t i=0;i<sizeof random;i++)snprintf(salt+2*i,3,"%02x",random[i]);
+  snprintf(secret,sizeof secret,"%s%s",ds_password,salt);md5_hex(secret,strlen(secret),token);ds_secret_clear(secret,sizeof secret);ds_secret_clear(random,sizeof random);
+  int len=snprintf(url,sizeof url,"%s/rest/%s.view?u=%s&t=%s&s=%s&v=1.16.1&c=DiscShelf&f=json%s%s",ds_server,endpoint,u,token,salt,args&&*args?"&":"",args?args:"");
   if (len < 0 || len >= (int)sizeof url)
     return 0;
   if (!ds_available_memory() ||
@@ -244,62 +245,13 @@ int ds_api_fetch(const char *endpoint, const char *args, const char *path,
     unlink(path);
   return ok;
 }
-int ds_config_read(const char *path, int test, char *err, size_t cap) {
-  net_test = test;
-  ds_server[0]=ds_username[0]=ds_password[0]=ds_download_root[0]=0;
-  FILE *f = fopen(path, "r");
-  if (!f) {
-    snprintf(err, cap, "Open Server to set up Navidrome.");
-    return 0;
-  }
-  char line[2048];
-  while (fgets(line, sizeof line, f)) {
-    if (!strchr(line, '\n') && !feof(f)) {
-      fclose(f);
-      snprintf(err, cap, "Config line too long.");
-      return 0;
-    }
-    line[strcspn(line, "\r\n")] = 0;
-    if (!*line || *line == '#')
-      continue;
-    char *eq = strchr(line, '=');
-    if (!eq)
-      continue;
-    *eq++ = 0;
-    char *dst = NULL;
-    size_t n = 0;
-#define CONF(k, v)                                                             \
-  if (!strcmp(line, k)) {                                                      \
-    dst = v;                                                                   \
-    n = sizeof v;                                                              \
-  }
-    CONF("server", ds_server)
-    CONF("username", ds_username)
-    CONF("password", ds_password) CONF("download_dir", ds_download_root) if (dst) {
-      if (strlen(eq) >= n) {
-        fclose(f);
-        snprintf(err, cap, "Config value too long.");
-        return 0;
-      }
-      strcpy(dst, eq);
-    }
-  }
-  fclose(f);
-  size_t n = strlen(ds_server);
-  while (n && ds_server[n - 1] == '/')
-    ds_server[--n] = 0;
-  if ((strncmp(ds_server, "http://", 7) && strncmp(ds_server, "https://", 8)) ||
-      strpbrk(ds_server, " \t\r\n?#") || !ds_username[0] || !ds_password[0]) {
-    snprintf(err, cap, "Set server, username, password\nin Server settings.");
-    return 0;
-  }
-  if (!ds_download_root[0])
-    strcpy(ds_download_root, "/tmp/sdcard/Navidrome");
-  if ((!net_test && strncmp(ds_download_root, "/tmp/sdcard/", 12)) ||
-      strstr(ds_download_root, "..") || strpbrk(ds_download_root, "\r\n") ||
-      strlen(ds_download_root) > 900) {
-    snprintf(err, cap, "download_dir must be on SD.");
-    return 0;
-  }
-  return 1;
+int ds_config_read(const char *path,int test,char *err,size_t cap){
+ net_test=test;ds_settings_t c;
+ if(!ds_settings_load(path,&c)){snprintf(err,cap,"Open Server to choose and configure a source.");ds_secret_clear(&c,sizeof c);return 0;}
+ atomic_store(&ds_source,c.source);
+ if(!ds_settings_validate(&c,test,err,cap)){ds_secret_clear(&c,sizeof c);return 0;}
+ ds_profile_t*p=&c.profile[c.source];
+ strcpy(ds_server,p->server);strcpy(ds_username,p->user);strcpy(ds_password,p->password);strcpy(ds_download_root,p->dest);strcpy(ds_smb_share,p->share);strcpy(ds_smb_domain,p->domain);
+ size_t n=strlen(ds_server);if(c.source==DS_NAVIDROME)while(n&&ds_server[n-1]=='/')ds_server[--n]=0;
+ ds_secret_clear(&c,sizeof c);return 1;
 }

@@ -4,6 +4,7 @@
 #include "lvgl/lvgl.h"
 void discshelf_create(lv_obj_t *root);
 void discshelf_open(void);
+void discshelf_landing(void);
 void discshelf_tick(void);
 void discshelf_stop(void);
 int discshelf_busy(void);

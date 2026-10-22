@@ -18,7 +18,7 @@ static void *run(void *unused){
         ds_status_text("%s",lease?error:"SD card is busy or unavailable");
         pthread_mutex_lock(&ds_shared.mu);ds_shared.fatal=1;ds_shared.busy=0;ds_shared.revision++;pthread_mutex_unlock(&ds_shared.mu);
         if(lease)shelf_close();
-    }else shelf_worker(NULL);
+    }else if(atomic_load(&ds_source)==DS_SMB)ds_smb_worker(NULL);else shelf_worker(NULL);
     if(lease)sd_io_end();
     /* Last access to context: UI may reclaim it after observing this release. */
     atomic_store_explicit(&finished,1,memory_order_release);

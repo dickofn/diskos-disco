@@ -99,7 +99,25 @@ static void sphere_icon(lv_obj_t *label, int size){                /* SongSphere
                else { lv_obj_set_style_bg_color(o, color, 0); lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0); } }
     }
 }
+/* A jewel case with a visible spine and CD: shared by Apps and navigation. */
+static void shelf_icon(lv_obj_t *label,int size){
+    if((intptr_t)lv_obj_get_user_data(label)!=6){lv_obj_clean(label);lv_obj_set_user_data(label,(void*)(intptr_t)6);}
+    lv_label_set_text(label,"");lv_obj_set_size(label,size,size);
+    lv_color_t color=lv_obj_get_style_text_color(label,0);
+    for(int i=0;i<4;i++){
+        lv_obj_t *o=lv_obj_get_child(label,i);
+        if(!o){o=lv_obj_create(label);lv_obj_remove_style_all(o);lv_obj_remove_flag(o,LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE);}
+        int border=size>=28?2:1;
+        lv_obj_set_style_border_color(o,color,0);lv_obj_set_style_border_width(o,border,0);
+        lv_obj_set_style_radius(o,i>=2?LV_RADIUS_CIRCLE:1,0);
+        if(i==0){lv_obj_set_size(o,size,size*9/10);lv_obj_center(o);}
+        if(i==1){lv_obj_set_size(o,size/6,size*9/10);lv_obj_align(o,LV_ALIGN_LEFT_MID,0,0);}
+        if(i==2){lv_obj_set_size(o,size*2/3,size*2/3);lv_obj_align(o,LV_ALIGN_CENTER,size/12,0);}
+        if(i==3){int d=size/6;if(d<3)d=3;lv_obj_set_size(o,d,d);lv_obj_align(o,LV_ALIGN_CENTER,size/12,0);}
+    }
+}
 static void roulette_icon(lv_obj_t *label, const char *icon, int size){
+    if(!strcmp(icon,"@shelf")){shelf_icon(label,size);return;}
     if(!strcmp(icon, IC_STATS)){ stats_icon(label, size); return; }
     if(!strcmp(icon, IC_SPHERE)){ sphere_icon(label, size); return; }
     if(!strcmp(icon, IC_APPS)){ apps_icon(label, size); return; }
@@ -174,7 +192,7 @@ static int g_menu[MAXM], g_nmenu, g_cur;           /* active items (indices into
 static dsec_t menu_section(int id){
     if(id>=0&&id<NSEC)return SEC[id];
     const menu_app_t *app=menu_apps_get(id-NSEC);
-    return (dsec_t){app?app->id:"",app?app->name:"App unavailable",LV_SYMBOL_FILE,app&&!strcmp(app->exec,APP_BUILTIN_SHELF)?SCR_SHELF:SCR_APPLAND,NULL,0};
+    return (dsec_t){app?app->id:"",app?app->name:"App unavailable",app&&!strcmp(app->exec,APP_BUILTIN_SHELF)?"@shelf":LV_SYMBOL_FILE,SCR_APPLAND,NULL,0};
 }
 static int sec_find(const char *id, size_t n){ for(int i = 0; i < NSEC; i++) if(strlen(SEC[i].id) == n && !strncmp(SEC[i].id, id, n)) return i; return -1; }
 static int menu_has_screen(int scr);
@@ -476,7 +494,7 @@ static void go_section(int idx, int dir){
     if(g_menu[idx] >= NSEC){                                         /* an installed app: its landing page, never a straight launch */
         const menu_app_t *app=menu_apps_get(g_menu[idx]-NSEC);
         if(!app){ ui_toast("That app is not installed"); return; }
-        if(!strcmp(app->exec,APP_BUILTIN_SHELF)){discshelf_open();onboarding_discovered(HINT_NAV);return;}
+        if(!strcmp(app->exec,APP_BUILTIN_SHELF)){discshelf_landing();onboarding_discovered(HINT_NAV);return;}
         applanding_icon(app->icon);
         applanding_show(app->name, app->tagline, app->about, app->button, app->exec);
         if(screen_current()==SCR_APPLAND)onboarding_discovered(HINT_NAV);

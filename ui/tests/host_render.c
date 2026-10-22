@@ -3,6 +3,7 @@
 #include "md5.h"
 #include "azjump.h"
 #include "discshelf.h"
+#include "discshelf/shelf.h"
 #include "roulette_backend.h"
 #include "lvgl/src/widgets/label/lv_label_private.h"
 #include "lvgl/src/misc/lv_timer_private.h"
@@ -929,6 +930,34 @@ int main(int argc, char **argv){
         }
         puts("PASS: battery 0..100/clamping/colour/no-glow; settings tokens; selector -> editor/back and EQ restore/failure");return 0;
     }
+    if(!strcmp(argv[3],"shelf-preview")||!strcmp(argv[3],"shelf-shortcuts")){
+        screen_set_anim(0);
+        if(!strcmp(argv[3],"shelf-preview")){
+            char hash[33];md5_hex("disc-shelf",10,hash);
+            simple_cfg_set_str(th_null()?"null_mnu":"disco_mnu","m0s");
+            simple_cfg_set_str(th_null()?"nm_app0":"dm_app0",hash);
+        }
+        screens_init();
+        if(!strcmp(argv[3],"shelf-preview")){
+            int disco_catalog_load(void);const char *disco_catalog_name(int);void disco_catalog_open(int);
+            int count=disco_catalog_load(),index=-1;
+            for(int i=0;i<count;i++)if(!strcmp(disco_catalog_name(i),"Disc Shelf"))index=i;
+            assert(index>=0);assert(!ds_context);disco_catalog_open(index);nav_wait(100);
+            assert(screen_current()==SCR_APPLAND&&!ds_context);
+            assert(find_visible_text(screen_get_root(SCR_APPLAND),"Open Disc Shelf"));
+            /* Visiting other preview pages and returning must not start Shelf. */
+            boomshine_landing();nav_wait(20);assert(!ds_context);
+            assert(!find_visible_text(screen_get_root(SCR_APPLAND),"Open Disc Shelf"));
+            discshelf_landing();nav_wait(100);assert(!ds_context);
+            puts("PASS: Disc Shelf menu preview stays on SCR_APPLAND; backend remains stopped");
+        }else{
+            char hash[33],key[48];md5_hex("disc-shelf",10,hash);snprintf(key,sizeof key,"appid:%s",hash);
+            simple_cfg_set_str("sc1",key);for(int i=2;i<=5;i++){char k[8];snprintf(k,sizeof k,"sc%d",i);simple_cfg_set_str(k,"");}
+            apps_reload();screen_show(SCR_APPS);nav_wait(100);
+            assert(find_visible_text(screen_get_root(SCR_APPS),"Disc Shelf"));
+        }
+        goto render;
+    }
     if(!strncmp(argv[3],"shelf-",6)){
         fixture=1;sd_io_init(media_local);assert(sd_io_resume());screen_set_anim(0);screens_init();
         if(!strcmp(argv[3]+6,"wheel"))cfg_set_int("library_seeking",1);
@@ -940,9 +969,10 @@ int main(int argc, char **argv){
           lv_obj_t*list=discshelf_test_list();lv_obj_t*row=lv_obj_get_child(list,0);lv_area_t a;lv_obj_get_coords(row,&a);int y=(a.y1+a.y2)/2;
           nav_pointer=(lv_indev_data_t){.point={150,y},.state=LV_INDEV_STATE_PRESSED};nav_wait(30);
           for(int x=150;x<=205;x+=5){nav_pointer.point.x=x;nav_wait(10);}nav_pointer.state=LV_INDEV_STATE_RELEASED;nav_wait(50);
-          assert(discshelf_test_selected()==1);assert(find_visible_text(screen_get_root(SCR_SHELF),"Download (1)"));
+          assert(discshelf_test_selected()==1);assert(lv_label_get_long_mode(lv_obj_get_child(row,0))==LV_LABEL_LONG_SCROLL_CIRCULAR);assert(find_visible_text(screen_get_root(SCR_SHELF),"Download (1)"));
           assert(!find_visible_text(screen_get_root(SCR_SHELF),"Play")&&!find_visible_text(screen_get_root(SCR_SHELF),"Queue"));
           assert(discshelf_back_consumed() && !discshelf_test_selected());
+          assert(lv_label_get_long_mode(lv_obj_get_child(row,0))==LV_LABEL_LONG_DOT);
           for(int c=0;c<8;c++){discshelf_test_reset();discshelf_preview("artists");nav_wait(10);}
           assert(!discshelf_test_selected());discshelf_test_reset();lv_indev_delete(in);
           puts("PASS native Disc Shelf: real swipe selection, Download-only actions, Back cancels, repeated preview open/close");return 0;

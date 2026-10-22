@@ -12,6 +12,8 @@ c=r'''
 #include <unistd.h>
 #include "discshelf/engine.c"
 shared_t *ds_context;
+char ds_password[256];
+void ds_secret_clear(void*p,size_t n){memset(p,0,n);}
 char ds_server[1024]="http://server",ds_download_root[1024],ds_state_dir[1100];
 static int fail, cancel, serial;
 int sd_io_allowed(void){return 1;}

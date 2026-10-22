@@ -38,3 +38,7 @@ installer **from source** with your own Python (`./install.sh` then `./diskos-in
 come from *your* system's Python and are **not redistributed by this project**. (`bash build/build.sh`
 is the separate, optional step that produces the onefile - if you run *that* and redistribute the
 result, the obligations above become yours.)
+
+### Native Disc Shelf SMB client
+
+libsmb2 6.3, commit `2bcb014b23a8c8cccf534eea8bda2fe5df453cfd`, LGPL-2.1-or-later. Complete pinned source, license and build inputs are in `ui/vendor/libsmb2`; build adapter is `ui/tools/build_smb.py`. It is linked statically into the GPL firmware; complete firmware source and relinking inputs are provided. SMB fixture/server test sources are not part of the firmware build.

@@ -906,6 +906,7 @@ void shelf_close(void) {
     db = NULL;
   }
   if(response[0])unlink(response);response[0]=0;
+  extern char ds_password[256];ds_secret_clear(ds_password,256);
   if (lockfd >= 0) {
     close(lockfd);
     lockfd = -1;

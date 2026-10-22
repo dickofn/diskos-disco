@@ -86,3 +86,5 @@ diskos-update/
 
 # Owner-specific Navidrome credentials
 shelf.conf
+
+/ui/vendor/smb-build/

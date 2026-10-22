@@ -12,6 +12,7 @@
 #include "curvelist.h"
 #include "folderbrowser.h"
 #include "books.h"
+void disco_vec_icon(lv_obj_t*,const char*,int);
 #include "md5.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -161,7 +162,7 @@ void shortcut_run(const char *key){
 static int sc_describe(const char *key, const char **glyph, char *name, size_t n, int *font){
     if(!strncmp(key, "app:", 4) || !strncmp(key, "appid:", 6)){
         int i = app_for_key(key);
-        *glyph = LV_SYMBOL_FILE; *font = 1;
+        *glyph = i>=0&&!strcmp(g_apps[i].exec,APP_BUILTIN_SHELF)?"@shelf":LV_SYMBOL_FILE; *font = 1;
         snprintf(name, n, "%s", i >= 0 ? g_apps[i].name : !strncmp(key, "app:", 4) ? key + 4 : "App unavailable");
         return 1;
     }
@@ -208,11 +209,13 @@ static void disco_build(void){
     for(int i = 0; i < cnt; i++){
         int f = g_items[first + i].font;
         if(th_simple() || th_null()){
-            squash_menu_row(g_box,i,g_items[first+i].icon,f==1?TF(ICON_28):f==2?&font_theme_20:TF(UI_24),g_items[first+i].name,disco_pick_cb,(void *)(intptr_t)i);
+            lv_obj_t *r=squash_menu_row(g_box,i,g_items[first+i].icon,f==1?TF(ICON_28):f==2?&font_theme_20:TF(UI_24),g_items[first+i].name,disco_pick_cb,(void *)(intptr_t)i);
+            if(!strcmp(g_items[first+i].icon,"@shelf"))disco_vec_icon(lv_obj_get_child(r,0),"@shelf",26);
             continue;
         }
         lv_obj_t *r = disco_row(g_box, 60 + i * 54, 50, g_items[first + i].icon, f == 1 ? TF(ICON_28) : f == 2 ? &font_theme_20 : TF(UI_24),
                                 g_items[first + i].name, disco_pick_cb, (void *)(intptr_t)(g_all ? i : i));
+        if(!strcmp(g_items[first+i].icon,"@shelf"))disco_vec_icon(lv_obj_get_child(r,0),"@shelf",26);
         lv_obj_update_layout(r);
         lv_obj_t *label=lv_obj_get_child(r,1);
         lv_obj_set_style_text_font(label,ui_font_cjk(20),0);
@@ -246,6 +249,7 @@ static void build_page(void){
         int f = g_items[first + i].font;
         lv_obj_set_style_text_font(g_orb.icon[i], f == 1 ? TF(ICON_28) : f == 2 ? &font_theme_20 : TF(UI_22), 0);
         lv_obj_set_style_text_color(g_orb.icon[i], ui_current_accent(), 0);
+        if(!strcmp(g_items[first+i].icon,"@shelf"))disco_vec_icon(g_orb.icon[i],"@shelf",28);
     }
     orbit_cap_width(&g_orb, 96, ui_font_cjk(14));
     orbit_braun_icons(&g_orb);
@@ -270,7 +274,7 @@ void apps_reload(void){
     /* All apps: Last.fm, the homebrew apps, Settings */
     g_items[g_nitems].icon = LFM_ICON; g_items[g_nitems].font = 1; snprintf(g_items[g_nitems].name, sizeof g_items[0].name, "Last.fm"); g_items[g_nitems].kind = 0; g_items[g_nitems].idx = -1; g_nitems++;
     for(int i = 0; i < g_napps && g_nitems < MAX_APPS + 1; i++){
-        g_items[g_nitems].icon = LV_SYMBOL_FILE; g_items[g_nitems].font = 1; snprintf(g_items[g_nitems].name, sizeof g_items[0].name, "%.63s", g_apps[i].name);
+        g_items[g_nitems].icon = !strcmp(g_apps[i].exec,APP_BUILTIN_SHELF)?"@shelf":LV_SYMBOL_FILE; g_items[g_nitems].font = 1; snprintf(g_items[g_nitems].name, sizeof g_items[0].name, "%.63s", g_apps[i].name);
         g_items[g_nitems].kind = 1; g_items[g_nitems].idx = i; g_nitems++;
     }
     g_items[g_nitems].icon = LV_SYMBOL_SETTINGS; g_items[g_nitems].font = 1; snprintf(g_items[g_nitems].name, sizeof g_items[0].name, "Settings"); g_items[g_nitems].kind = 2; g_items[g_nitems].idx = -1; g_nitems++;

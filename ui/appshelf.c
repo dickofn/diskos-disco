@@ -62,6 +62,7 @@ static void scan(void){
         snprintf(a->tagline, sizeof a->tagline, "%s", m->tagline); snprintf(a->about, sizeof a->about, "%s", m->about);
         snprintf(a->button, sizeof a->button, "%s", m->button); snprintf(a->exec, sizeof a->exec, "%s", m->exec);
         snprintf(a->icon, sizeof a->icon, "%s", m->icon);
+        if(!strcmp(m->exec,APP_BUILTIN_SHELF))a->vec="@shelf";
     }
 }
 static int find_id(const char *id){ for(int i = 0; i < g_nall; i++) if(id[0] && !strcmp(g_all[i].id, id)) return i; return -1; }
@@ -211,7 +212,7 @@ static void open_cb(lv_event_t *e){
     int i = (int)(intptr_t)lv_event_get_user_data(e);
     if(i < 0 || i >= g_nall) return;
     const shelf_app_t *a = &g_all[i];
-    if(!strcmp(a->exec, APP_BUILTIN_SHELF)){discshelf_open();return;}
+    if(!strcmp(a->exec, APP_BUILTIN_SHELF)){discshelf_landing();return;}
     if(!strcmp(a->exec, APP_BUILTIN_SPHERE)){ sphere_ui_open(); return; }   /* its first page is its landing page */
     if(!strcmp(a->exec, APP_BUILTIN_ROULETTE)){ screen_show(SCR_ROULETTE); return; }   /* its own vinyl landing page */
     applanding_icon(a->icon);

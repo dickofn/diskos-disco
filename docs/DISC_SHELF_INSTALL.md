@@ -415,3 +415,11 @@ The installer, scripts and docs are **MIT** ([LICENSE](LICENSE)). The on-device 
 > [!WARNING]
 > Never share generated `diskos_*.bin` images: they contain FiiO's root filesystem. Share the installer and let
 > people build from their own firmware.
+
+## Native Disc Shelf: Navidrome or SMB3 (development build)
+
+Open Disc Shelf, then Server. Choose **Navidrome** or **SMB3**, enter the selected source's details and press Save. Only the selected source connects. For SMB, enter the host/IP and share name separately; folders and files can be selected for Download. Download again only replaces copies owned by Disc Shelf; unrelated existing files are kept.
+
+Fresh profiles do not remember passwords by default. Remember password On stores readable credentials in the root-only app configuration; it is not encrypted storage. SMB3 requires encrypted transport. For Navidrome, use HTTPS and keep authentication URLs private.
+
+See [SMB3 integration, privacy and test limits](plans/disc-shelf-smb3.md) for exact behaviour. This is a development test build, with no new release tag and no physical Disc/NAS validation yet.
