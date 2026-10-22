@@ -678,6 +678,8 @@ button=Open Disc Shelf
 
 ## SongSphere
 
+Open it from the menu or app shortcuts to see a themed preview, then press **Open SongSphere**. Browsing the preview does not open its library database.
+
 **Music by mood**, built in since 2.2.0 (Settings > Playback > SongSphere turns it off). Place your music on a sphere,
 from Calm to Energetic and from Dark to Bright, by dragging the marker, then drag to the mood you're in and play.
 

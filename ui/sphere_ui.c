@@ -411,6 +411,12 @@ static int ready(void){
     if(!db_ready()){ ui_toast("SongSphere can't read the library"); return 0; }
     return 1;
 }
+void sphere_ui_landing(void){
+    if(!sphere_ui_enabled()){ui_toast("SongSphere is off: Settings > Playback");return;}
+    /* Browsing this page does not initialize fonts, open a DB or build a sphere. */
+    applanding_icon(NULL);
+    applanding_show("SongSphere","Find your mood.","Place songs. Play a feeling.","Open SongSphere",APP_BUILTIN_SPHERE);
+}
 void sphere_ui_open(void){
     if(!sphere_ui_enabled()){ ui_toast("SongSphere is off: Settings > Playback"); return; }
     if(!ready()) return;

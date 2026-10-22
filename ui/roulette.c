@@ -72,7 +72,7 @@ void roulette_create(lv_obj_t *root){
 /* ---- App landing page: Boomshine, and any installed app (text from its app.conf, or plain defaults). */
 static lv_obj_t *g_land_root, *g_land_art, *g_land_title, *g_land_tag, *g_land_about, *g_land_btn_l;
 static char g_land_exec[256], g_land_icon[264];
-static lv_obj_t *g_shelf_preview;
+static lv_obj_t *g_shelf_preview,*g_sphere_preview;
 void applanding_icon(const char *bmp_path){ snprintf(g_land_icon, sizeof g_land_icon, "%s", bmp_path ? bmp_path : ""); }
 static void land_cb(lv_event_t *e){
     (void)e;
@@ -128,7 +128,7 @@ static void land_art(const char *name, int boom){
 }
 void applanding_create(lv_obj_t *root){
     g_land_root = root;
-    g_shelf_preview = NULL;
+    g_shelf_preview = g_sphere_preview = NULL;
     lv_obj_set_style_bg_color(root, TC(CANVAS), 0);
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
     lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLLABLE);
@@ -157,18 +157,20 @@ void applanding_create(lv_obj_t *root){
 void applanding_show(const char *name, const char *tagline, const char *about, const char *button, const char *exec){
     if(!g_land_root) return;
     snprintf(g_land_exec, sizeof g_land_exec, "%s", exec ? exec : "");
-    int shelf=!strcmp(g_land_exec,APP_BUILTIN_SHELF);
+    int shelf=!strcmp(g_land_exec,APP_BUILTIN_SHELF),sphere=!strcmp(g_land_exec,APP_BUILTIN_SPHERE);
     lv_obj_t *generic[]={g_land_art,g_land_title,g_land_tag,g_land_about,lv_obj_get_parent(g_land_btn_l)};
     for(unsigned i=0;i<sizeof generic/sizeof *generic;i++){
-        if(shelf)lv_obj_add_flag(generic[i],LV_OBJ_FLAG_HIDDEN);
+        if(shelf||sphere)lv_obj_add_flag(generic[i],LV_OBJ_FLAG_HIDDEN);
         else lv_obj_remove_flag(generic[i],LV_OBJ_FLAG_HIDDEN);
     }
-    if(shelf){
-        if(!g_shelf_preview)g_shelf_preview=shelf_preview_create(g_land_root,land_cb);
-        lv_obj_remove_flag(g_shelf_preview,LV_OBJ_FLAG_HIDDEN);g_land_icon[0]=0;
+    if(g_shelf_preview)lv_obj_add_flag(g_shelf_preview,LV_OBJ_FLAG_HIDDEN);
+    if(g_sphere_preview)lv_obj_add_flag(g_sphere_preview,LV_OBJ_FLAG_HIDDEN);
+    if(shelf||sphere){
+        lv_obj_t **guard=sphere?&g_sphere_preview:&g_shelf_preview;
+        if(!*guard)*guard=app_guard_create(g_land_root,land_cb,sphere?APP_GUARD_SPHERE:APP_GUARD_SHELF);
+        lv_obj_remove_flag(*guard,LV_OBJ_FLAG_HIDDEN);g_land_icon[0]=0;
         screen_show(SCR_APPLAND);return;
     }
-    if(g_shelf_preview)lv_obj_add_flag(g_shelf_preview,LV_OBJ_FLAG_HIDDEN);
     land_art(name, !strcmp(g_land_exec, APP_BUILTIN_BOOMSHINE) ? 1 : !strcmp(g_land_exec, APP_BUILTIN_STATS) ? 2 : 0);
     if(g_land_icon[0] && strncmp(g_land_exec, "builtin:", 8) && !access(g_land_icon, R_OK)){   /* the app's own icon */
         static lv_image_dsc_t *ic;

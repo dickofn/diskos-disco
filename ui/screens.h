@@ -248,6 +248,7 @@ void applanding_icon(const char *bmp_path);  /* the next applanding_show() draws
 int  stats_back_consumed(void);
 /* SongSphere, built in (sphere_ui.c). kind: 0 song (key = path), 1 album (album name), 2 artist */
 void sphere_ui_create(lv_obj_t *root);
+void sphere_ui_landing(void);
 void sphere_ui_open(void);
 void sphere_ui_tag(int kind, const char *key, const char *name);
 int  sphere_ui_enabled(void);                /* Settings > Playback > SongSphere */

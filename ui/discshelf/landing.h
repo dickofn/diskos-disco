@@ -6,4 +6,6 @@ lv_obj_t *shelf_brand_icon(lv_obj_t*,int,int,int);
 lv_obj_t *shelf_home_exit(void);
 void shelf_home_status(const char*,int);
 
-lv_obj_t *shelf_preview_create(lv_obj_t*,lv_event_cb_t);
+/* Static app guards share typography/buttons; kind selects the backdrop. */
+enum { APP_GUARD_SHELF, APP_GUARD_SPHERE };
+lv_obj_t *app_guard_create(lv_obj_t*,lv_event_cb_t,int);

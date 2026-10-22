@@ -183,7 +183,7 @@ static const dsec_t SEC[] = {
     { "boomshine", "Boomshine", IC_BOOM,            SCR_APPLAND,   open_boomshine,    0 },
     { "stats",     "Stats",     IC_STATS,           SCR_APPLAND,   stats_landing,     0 },
     { "apps",      "Apps",      IC_APPS,            SCR_APPSHELF,  appshelf_open,     0 },
-    { "songsphere","SongSphere", IC_SPHERE,         SCR_SPHERE,    sphere_ui_open,    0 },
+    { "songsphere","SongSphere", IC_SPHERE,         SCR_APPLAND,   sphere_ui_landing,    0 },
 };
 #define NSEC ((int)(sizeof SEC / sizeof SEC[0]))
 #define MAXM 10                                    /* the picker holds at most ten (the dots must fit) */

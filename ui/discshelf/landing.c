@@ -77,13 +77,30 @@ void shelf_home_status(const char *text,int busy){
 }
 
 /* Menu preview only: no configuration read, backend, SD lease or network work. */
-lv_obj_t *shelf_preview_create(lv_obj_t *parent,lv_event_cb_t launch){
- lv_obj_t *group=box(parent,0,0,360,360,TC(CANVAS),255,0);kit_keep(group);shelf(group);
- shelf_brand_icon(group,144,40,72);
- lv_obj_t *l=txt(group,"Disc Shelf",40,128,280,TF(UI_32));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);
- l=txt(group,"Your music, to go.",44,180,272,TF(UI_18));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_set_style_text_color(l,TC(ACCENT_PRIMARY),0);
- l=txt(group,"Navidrome or SMB3.",44,214,272,TF(UI_16));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_set_style_text_color(l,TC(TEXT_SECONDARY),0);
- lv_obj_t *b=pill(group,"Open Disc Shelf",70,260,220,52,TF(UI_22));
+static void mood_backdrop(lv_obj_t *parent){
+ /* Quiet mood-map contours: vectors only, no sphere engine or animation. */
+ lv_color_t c=TC(TEXT_SECONDARY);
+ for(int i=0;i<4;i++){
+  int d=118+i*48;
+  lv_obj_t *ring=box(parent,286-d/2,146-d/2,d,d,TC(CANVAS),0,LV_RADIUS_CIRCLE);
+  lv_obj_set_style_border_width(ring,1,0);lv_obj_set_style_border_color(ring,c,0);
+  lv_obj_set_style_border_opa(ring,24+i*5,0);
+ }
+ lv_obj_t *marker=box(parent,284,74,20,20,TC(ACCENT_PRIMARY),30,LV_RADIUS_CIRCLE);
+ lv_obj_set_style_border_width(marker,2,0);lv_obj_set_style_border_color(marker,TC(ACCENT_PRIMARY),0);lv_obj_set_style_border_opa(marker,70,0);
+}
+lv_obj_t *app_guard_create(lv_obj_t *parent,lv_event_cb_t launch,int kind){
+ int sphere=kind==APP_GUARD_SPHERE;
+ lv_obj_t *group=box(parent,0,0,360,360,TC(CANVAS),255,0);kit_keep(group);
+ if(sphere)mood_backdrop(group);else shelf(group);
+ if(sphere){lv_obj_t *icon=lv_label_create(group);lv_obj_set_style_text_color(icon,TC(ACCENT_PRIMARY),0);kit_keep(icon);disco_vec_icon(icon,"@sphere",72);lv_obj_set_pos(icon,144,40);}
+ else shelf_brand_icon(group,144,40,72);
+ lv_obj_t *l=txt(group,sphere?"SongSphere":"Disc Shelf",40,128,280,TF(UI_32));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);
+ l=txt(group,sphere?"Find your mood.":"Your music, to go.",44,180,272,TF(UI_18));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_set_style_text_color(l,TC(ACCENT_PRIMARY),0);
+ l=txt(group,sphere?"Place songs. Play a feeling.":"Navidrome or SMB3.",44,214,272,TF(UI_16));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_set_style_text_color(l,TC(TEXT_SECONDARY),0);
+ lv_obj_t *b=pill(group,sphere?"Open SongSphere":"Open Disc Shelf",70,260,220,52,TF(UI_22));
+ /* Preserve the measured face when the shared theme pass visits the guard. */
+ kit_keep(lv_obj_get_child(b,0));
  lv_obj_set_style_border_width(b,2,0);lv_obj_add_event_cb(b,launch,LV_EVENT_CLICKED,NULL);
  return group;
 }

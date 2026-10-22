@@ -106,3 +106,14 @@ Protocol work is confined to the existing on-demand worker. Directory query buff
   power and battery effects require measurement on the Disc with the same server,
   track and SD card. This patch adds no rate limit or parallel downloads, does not
   change SMB read sizes, and does not remove durability or space-reserve checks.
+
+## Shared SongSphere guard
+
+SongSphere now uses the same static guard layout as Disc Shelf, with its own
+sphere vector icon, mood-map contours and explicit Open SongSphere button.
+Disco/Null menu browsing, All apps and app shortcuts show SCR_APPLAND first;
+only the button calls the existing sphere_ui_open(). Direct album/artist/song
+tagging remains immediate. The guard creates no sphere engine, DB connection,
+worker or animation timer. Native LVGL fixtures exercise all three themes,
+preview switching/cleanup, menu and app dispatch, and a wrapped ssdb_open that
+asserts zero opens before clicking and one attempt after clicking Open.

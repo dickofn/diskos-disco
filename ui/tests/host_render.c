@@ -33,6 +33,9 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+static int guard_db_opens;
+int __real_ssdb_open(void);
+int __wrap_ssdb_open(void){guard_db_opens++;return getenv("REVIEW_GUARD")?0:__real_ssdb_open();}
 #include <stdatomic.h>
 
 /* Host-only controlled failure: hold album B's load while the UI returns to A. */
@@ -772,6 +775,33 @@ int main(int argc, char **argv){
         screen_set_anim(0);screens_init();screen_show(SCR_HOME);
         void ui_show_volume(int); ui_show_volume(74);
         for(int i=0;i<30;i++){lv_tick_inc(10);lv_timer_handler();}
+        goto render;
+    }
+    if(!strcmp(argv[3],"ssphere-guard")){
+        screen_set_anim(0);cfg_set_int("songsphere",1);
+        simple_cfg_set_str(th_null()?"null_mnu":"disco_mnu","mP");screens_init();
+        sphere_ui_landing();nav_wait(100);
+        assert(screen_current()==SCR_APPLAND && !guard_db_opens && !ds_context);
+        assert(find_visible_text(screen_get_root(SCR_APPLAND),"Open SongSphere"));
+        boomshine_landing();nav_wait(20);
+        assert(!find_visible_text(screen_get_root(SCR_APPLAND),"Open SongSphere"));
+        discshelf_landing();nav_wait(20);
+        assert(find_visible_text(screen_get_root(SCR_APPLAND),"Open Disc Shelf"));
+        assert(!find_visible_text(screen_get_root(SCR_APPLAND),"Open SongSphere"));
+        int disco_catalog_load(void);const char *disco_catalog_name(int);void disco_catalog_open(int);
+        int count=disco_catalog_load(),index=-1;
+        for(int i=0;i<count;i++)if(!strcmp(disco_catalog_name(i),"SongSphere"))index=i;
+        assert(index>=0);disco_catalog_open(index);nav_wait(100);
+        assert(screen_current()==SCR_APPLAND && !guard_db_opens && !ds_context);
+        assert(!find_visible_text(screen_get_root(SCR_APPLAND),"Open Disc Shelf"));
+        assert(find_visible_text(screen_get_root(SCR_APPLAND),"Open SongSphere"));
+        app_launch(APP_BUILTIN_SPHERE);nav_wait(20);assert(screen_current()==SCR_APPLAND && !guard_db_opens);
+        if(getenv("REVIEW_GUARD")){
+            lv_obj_t *label=find_visible_text(screen_get_root(SCR_APPLAND),"Open SongSphere");
+            lv_obj_send_event(lv_obj_get_parent(label),LV_EVENT_CLICKED,NULL);
+            assert(guard_db_opens==1);
+            puts("PASS: SongSphere static guard on catalog/app launch; only Open initializes DB; other previews restored");
+        }
         goto render;
     }
     if(!strncmp(argv[3],"ssphere-",8)){            /* SongSphere built in: ssphere-0 first page, -1 list, -3 play; ssphere-tag = an album's tag page */

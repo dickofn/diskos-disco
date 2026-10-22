@@ -213,7 +213,7 @@ static void open_cb(lv_event_t *e){
     if(i < 0 || i >= g_nall) return;
     const shelf_app_t *a = &g_all[i];
     if(!strcmp(a->exec, APP_BUILTIN_SHELF)){discshelf_landing();return;}
-    if(!strcmp(a->exec, APP_BUILTIN_SPHERE)){ sphere_ui_open(); return; }   /* its first page is its landing page */
+    if(!strcmp(a->exec, APP_BUILTIN_SPHERE)){ sphere_ui_landing(); return; }   /* Static guard; initialize SongSphere only after Open. */
     if(!strcmp(a->exec, APP_BUILTIN_ROULETTE)){ screen_show(SCR_ROULETTE); return; }   /* its own vinyl landing page */
     applanding_icon(a->icon);
     applanding_show(a->name, a->tagline, a->about, a->button, a->exec);
