@@ -38,6 +38,30 @@ static lv_obj_t *host_root, *choice;
 static curvelist_t list_curve;
 static int closing, preview_mode, hint_requested;
 static uint32_t last_tick;
+/* Four one-second samples, computed only while the download screen is visible. */
+static struct {
+ unsigned serial; uint32_t tick, elapsed[4]; int64_t bytes, delta[4];
+ int active, count, next; double rate;
+} download_speed;
+static double progress_speed(unsigned serial,int64_t bytes,uint32_t now){
+ if(!download_speed.active || serial!=download_speed.serial || bytes<download_speed.bytes){
+  memset(&download_speed,0,sizeof download_speed);
+  download_speed.active=1;download_speed.serial=serial;
+  download_speed.tick=now;download_speed.bytes=bytes;return -1;
+ }
+ uint32_t elapsed=now-download_speed.tick;
+ if(elapsed>=1000){
+  int i=download_speed.next;download_speed.delta[i]=bytes-download_speed.bytes;
+  download_speed.elapsed[i]=elapsed;download_speed.next=(i+1)%4;
+  if(download_speed.count<4)download_speed.count++;
+  int64_t sum=0;uint64_t ms=0;
+  for(i=0;i<download_speed.count;i++){sum+=download_speed.delta[i];ms+=download_speed.elapsed[i];}
+  download_speed.rate=ms?(double)sum*1000/ms:0;
+  download_speed.tick=now;download_speed.bytes=bytes;
+ }
+ return download_speed.count?download_speed.rate:-1;
+}
+
 static int title_width, restart_after_close;
 static void settings_cb(lv_event_t *e);
 static mp_gesture_t swipe;
@@ -359,7 +383,8 @@ static void positions(void){
 }
 static void update_title(void){
  if(!heading)return;char b[STR];
- if(nselected)snprintf(b,sizeof b,"%d selected",nselected);
+ if(busy&&copying)snprintf(b,sizeof b,"Downloading");
+ else if(nselected)snprintf(b,sizeof b,"%d selected",nselected);
  else snprintf(b,sizeof b,"%s",view==ARTISTS?"Artists":view==ARTIST_ALBUMS?"Albums":view==SMB_BROWSER&&level==0?"Files":captions[level]);
  theme_title_text(heading,b);
  /* Dynamic titles may step down a face: centre the new face rather than
@@ -484,10 +509,15 @@ static void render(void){
  memset(row_pool,0,sizeof row_pool);lv_obj_clean(content);list_extent=NULL;progress_label=NULL;progress_bar=NULL;progress_amount=NULL;progress_percent=NULL;
  if(reporting||fatal){progress_label=label(content,report_message,44,20,230,TF(UI_20));lv_label_set_long_mode(progress_label,LV_LABEL_LONG_WRAP);}
  else if(busy){
-  progress_label=label(content,"Loading...",44,8,240,TF(UI_20));lv_obj_set_height(progress_label,56);lv_label_set_long_mode(progress_label,LV_LABEL_LONG_WRAP);
-  progress_percent=label(content,"",44,66,240,TF(UI_48));lv_obj_set_style_text_align(progress_percent,LV_TEXT_ALIGN_CENTER,0);
-  progress_bar=lv_bar_create(content);lv_obj_set_pos(progress_bar,60,134);lv_obj_set_size(progress_bar,240,10);lv_obj_set_style_bg_color(progress_bar,TC(CONTROL_TRACK),0);lv_obj_set_style_bg_color(progress_bar,TC(ACCENT_PRIMARY),LV_PART_INDICATOR);
-  progress_amount=label(content,"",44,152,240,TF(UI_20));lv_obj_set_style_text_align(progress_amount,LV_TEXT_ALIGN_CENTER,0);
+  progress_label=label(content,"Loading...",44,16,240,TF(UI_20));kit_keep(progress_label);
+  lv_obj_set_style_text_line_space(progress_label,0,0);
+  lv_obj_set_height(progress_label,3*lv_font_get_line_height(TF(UI_20)));
+  lv_label_set_long_mode(progress_label,LV_LABEL_LONG_DOT);
+  const lv_font_t *percent_font=th_null()?TF(UI_18):TF(UI_24);
+  progress_percent=label(content,"",44,108,240,percent_font);kit_keep(progress_percent);lv_obj_set_height(progress_percent,lv_font_get_line_height(percent_font));lv_label_set_long_mode(progress_percent,LV_LABEL_LONG_CLIP);lv_obj_set_style_text_align(progress_percent,LV_TEXT_ALIGN_CENTER,0);
+  progress_bar=lv_bar_create(content);lv_obj_set_pos(progress_bar,52,150);lv_obj_set_size(progress_bar,240,10);lv_obj_set_style_bg_color(progress_bar,TC(CONTROL_TRACK),0);lv_obj_set_style_bg_color(progress_bar,TC(ACCENT_PRIMARY),LV_PART_INDICATOR);
+  const lv_font_t *amount_font=th_null()?TF(UI_20):TF(UI_28);
+  progress_amount=label(content,"",44,174,240,amount_font);kit_keep(progress_amount);lv_obj_set_height(progress_amount,lv_font_get_line_height(amount_font));lv_label_set_long_mode(progress_amount,LV_LABEL_LONG_CLIP);lv_obj_set_style_text_align(progress_amount,LV_TEXT_ALIGN_CENTER,0);
  }else{
   for(int i=0;i<PAGE;i++)row_create(i);
   list_extent=lv_obj_create(content);lv_obj_remove_style_all(list_extent);lv_obj_set_size(list_extent,1,1);lv_obj_remove_flag(list_extent,LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE);
@@ -502,9 +532,9 @@ static void tick(lv_timer_t *timer){
  if(az_open())return;
  /* Keep a row under the finger stable while a viewport result is delivered. */
  for(lv_indev_t *in=lv_indev_get_next(NULL);in;in=lv_indev_get_next(in))if(lv_indev_get_state(in)==LV_INDEV_STATE_PRESSED)return;
- int redraw=0;int64_t bytes,total;char text[256];int b;
+ int redraw=0;int64_t bytes,total;char text[256];int b;unsigned transfer;
  pthread_mutex_lock(&ds_shared.mu);
- b=ds_shared.busy;bytes=ds_shared.byte_done;total=ds_shared.byte_total;
+ b=ds_shared.busy;bytes=ds_shared.byte_done;total=ds_shared.byte_total;transfer=ds_shared.transfer_serial;
  snprintf(text,sizeof text,"%s",ds_shared.message);
  if(ds_shared.revision!=revision){
   revision=ds_shared.revision;
@@ -527,9 +557,17 @@ static void tick(lv_timer_t *timer){
   set_text(progress_label,text);
   char amount[96];if(total>0)snprintf(amount,sizeof amount,"%.1f / %.1f MiB",bytes/1048576.0,total/1048576.0);else amount[0]=0;
   if(progress_amount)set_text(progress_amount,amount);
-  if(progress_bar && total>0){int percent=(int)(bytes*100/total);lv_bar_set_value(progress_bar,percent,LV_ANIM_OFF);char value[16];snprintf(value,sizeof value,"%d%%",percent);if(progress_percent)set_text(progress_percent,value);}
+  if(progress_bar && total>0){
+   int percent=bytes>=total?100:(int)(bytes*100/total);
+   lv_bar_set_value(progress_bar,percent,LV_ANIM_OFF);
+   double speed=progress_speed(transfer,bytes,lv_tick_get());char value[64];
+   if(speed<0)snprintf(value,sizeof value,"%d%%",percent);
+   else if(speed>=1048576)snprintf(value,sizeof value,"%d%% / %.1f MiB/s",percent,speed/1048576);
+   else snprintf(value,sizeof value,"%d%% / %.0f KiB/s",percent,speed/1024);
+   if(progress_percent)set_text(progress_percent,value);
+  }else download_speed.active=0;
  }
- if(!busy && view!=HOME)scroll_page(NULL);
+ if(!busy){download_speed.active=0;if(view!=HOME)scroll_page(NULL);}
 }
 
 static void build(void) {
@@ -638,6 +676,15 @@ void discshelf_preview(const char *scene){
   if(!strcmp(scene,"dialog"))download_cb(NULL);
  }
  if(!strcmp(scene,"setup")||!strcmp(scene,"smb-setup")){ds_setup_open(NULL);if(!strcmp(scene,"smb-setup")){void ds_setup_preview_source(int);ds_setup_preview_source(DS_SMB);}}
+ if(!strcmp(scene,"download")){
+  view=TRACKS;busy=copying=1;download_speed.active=0;render();
+  pthread_mutex_lock(&ds_shared.mu);ds_shared.busy=1;ds_shared.byte_done=37LL*1048576;ds_shared.byte_total=86LL*1048576;
+  snprintf(ds_shared.message,sizeof ds_shared.message,"Downloading Everything in Its Right Place - Live at the Roundhouse, London, Special Extended Anniversary Edition\n3 saved / 2 already local");
+  pthread_mutex_unlock(&ds_shared.mu);tick(NULL);
+  lv_tick_inc(1000);ds_shared.byte_done+=820*1024;tick(NULL);
+  assert(strstr(lv_label_get_text(progress_percent),"820 KiB/s"));
+  lv_obj_update_layout(content);assert(lv_obj_get_height(progress_label)==3*lv_font_get_line_height(TF(UI_20)));
+ }
  if(!strcmp(scene,"grid")){azjump_show(&alphabet,1);lv_obj_send_event(alphabet.btn,LV_EVENT_SHORT_CLICKED,NULL);}
  if(!strcmp(scene,"wheel")){azjump_show(&alphabet,1);lv_obj_send_event(alphabet.btn,LV_EVENT_LONG_PRESSED,NULL);}
 }

@@ -168,7 +168,7 @@ static int download_file(smb_state_t*s,const char*path,int replace,int*saved,int
  if(ok&&!skip){ok=ds_available_memory()&&ds_storage_headroom(before.smb2_size);if(ok){for(int n=0;n<20;n++){snprintf(tmp,sizeof tmp,".shelf-%ld-%d.part",(long)getpid(),n);if(!strcmp(tmp,name))continue;fd=openat(dir,tmp,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);if(fd>=0)break;if(errno!=EEXIST)break;}ok=fd>=0;temp_owned=ok;}}
  if(ok&&!skip){
   ds_status_text("Downloading %s",name);uint64_t pos=0;
-  pthread_mutex_lock(&ds_shared.mu);ds_shared.byte_done=0;ds_shared.byte_total=before.smb2_size;pthread_mutex_unlock(&ds_shared.mu);
+  pthread_mutex_lock(&ds_shared.mu);ds_shared.transfer_serial++;ds_shared.byte_done=0;ds_shared.byte_total=before.smb2_size;pthread_mutex_unlock(&ds_shared.mu);
   uint32_t max=smb2_get_max_read_size(s->client);if(max>CHUNK)max=CHUNK;if(!max)ok=0;
   while(ok&&pos<before.smb2_size){uint32_t count=before.smb2_size-pos<max?(uint32_t)(before.smb2_size-pos):max;begin(s);ok=!cancelled()&&smb2_pread_async(s->client,fh,s->buffer,count,pos,rpc_cb,s)>=0&&wait_rpc(s);if(!ok)break;int got=s->status;if(got<=0||(uint32_t)got>count){ok=0;break;}int at=0;while(at<got){ssize_t n=write(fd,s->buffer+at,got-at);if(n<0&&errno==EINTR)continue;if(n<=0){ok=0;break;}at+=n;}pos+=got;pthread_mutex_lock(&ds_shared.mu);ds_shared.byte_done=pos;pthread_mutex_unlock(&ds_shared.mu);}
   if(ok)ok=stat_remote(s,fh,&after)&&stable(&before,&after)&&!cancelled()&&fsync(fd)==0;

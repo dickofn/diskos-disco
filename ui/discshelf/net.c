@@ -75,6 +75,24 @@ static time_t mono(void) {
   clock_gettime(CLOCK_MONOTONIC, &t);
   return t.tv_sec;
 }
+/* Coalesce wget's small pipe packets into SD-friendly writes. Heap-backed:
+ * the worker has a deliberately bounded 256 KiB stack. */
+#define TRANSFER_BUFFER (128u * 1024u)
+static uint64_t mono_ms(void) {
+  struct timespec t;
+  clock_gettime(CLOCK_MONOTONIC, &t);
+  return (uint64_t)t.tv_sec * 1000 + t.tv_nsec / 1000000;
+}
+static int transfer_write(int fd, const unsigned char *data, size_t count) {
+  while (count) {
+    if (atomic_load(&ds_stopping) || atomic_load(&ds_abort_job)) return 0;
+    ssize_t n = write(fd, data, count);
+    if (n < 0 && errno == EINTR) continue;
+    if (n <= 0) return 0;
+    data += n; count -= (size_t)n;
+  }
+  return 1;
+}
 static int magic_ok(const unsigned char *b, size_t n) {
   return n >= 12 &&
          (!memcmp(b, "fLaC", 4) || !memcmp(b, "ID3", 3) ||
@@ -108,8 +126,11 @@ int ds_api_fetch(const char *endpoint, const char *args, const char *path,
       open(path, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0600);
   if (fd < 0)
     return 0;
+  unsigned char *buffer = malloc(TRANSFER_BUFFER);
+  if (!buffer) { close(fd); unlink(path); return 0; }
   int pipes[2];
   if (pipe2(pipes, O_CLOEXEC)) {
+    free(buffer);
     close(fd);
     unlink(path);
     return 0;
@@ -132,16 +153,19 @@ int ds_api_fetch(const char *endpoint, const char *args, const char *path,
   posix_spawn_file_actions_destroy(&actions);
   close(pipes[1]);
   if (rc) {
+    free(buffer);
     close(pipes[0]);
     close(fd);
     unlink(path);
     ds_status_text("wget unavailable: cannot connect.");
     return 0;
   }
-  unsigned char buffer[32768], head[16];
-  size_t hn = 0;
-  int64_t total = 0, checked = 0, reported = 0;
+  unsigned char head[16];
+  size_t hn = 0, pending = 0;
+  uint64_t flushed = mono_ms(), reported = flushed;
+  int64_t total = 0, checked = 0;
   pthread_mutex_lock(&ds_shared.mu);
+  ds_shared.transfer_serial++;
   ds_shared.byte_done = 0;
   ds_shared.byte_total = expected;
   pthread_mutex_unlock(&ds_shared.mu);
@@ -161,55 +185,53 @@ int ds_api_fetch(const char *endpoint, const char *args, const char *path,
       ok = 0;
       break;
     }
-    if (!pr)
-      continue;
-    ssize_t n = read(pipes[0], buffer, sizeof buffer);
-    if (n < 0) {
-      if (errno == EINTR)
-        continue;
-      ok = 0;
-      break;
-    }
-    if (!n)
-      break;
-    last = mono();
-    if (total + n > max || (expected > 0 && total + n > expected)) {
-      ok = 0;
-      break;
-    }
-    if (hn < sizeof head) {
-      size_t take = (size_t)n < sizeof head - hn ? (size_t)n : sizeof head - hn;
-      memcpy(head + hn, buffer, take);
-      hn += take;
-    }
-    if (total - checked >= 1024 * 1024 || !total) {
-      if (!shelf_sd_ready() || !space_ok(ds_state_dir, 0) || !ds_available_memory()) {
-        ok = 0;
-        ds_status_text("Stopped: SD unavailable or resources low.");
-        break;
+    int eof = 0;
+    if (pr) {
+      ssize_t n = read(pipes[0], buffer + pending, TRANSFER_BUFFER - pending);
+      if (n < 0) {
+        if (errno == EINTR) continue;
+        ok = 0; break;
       }
-      checked = total;
-    }
-    for (ssize_t off = 0; off < n;) {
-      ssize_t w = write(fd, buffer + off, n - off);
-      if (w < 0 && errno == EINTR)
-        continue;
-      if (w <= 0) {
-        ok = 0;
-        break;
+      eof = !n;
+      if (n) {
+        last = mono();
+        if (n > max - total || (expected > 0 && n > expected - total)) {
+          ok = 0; break;
+        }
+        if (hn < sizeof head) {
+          size_t take = (size_t)n < sizeof head - hn ? (size_t)n : sizeof head - hn;
+          memcpy(head + hn, buffer + pending, take); hn += take;
+        }
+        if (total - checked >= 1024 * 1024 || !total) {
+          if (!shelf_sd_ready() || !space_ok(ds_state_dir, 0) || !ds_available_memory()) {
+            ok = 0;
+            ds_status_text("Stopped: SD unavailable or resources low.");
+            break;
+          }
+          checked = total;
+        }
+        pending += (size_t)n; total += n;
       }
-      off += w;
     }
-    if (!ok)
+    /* Flush a partial buffer even if the sender stalls; never wait for a full
+     * batch before responding to cancellation or updating saved-byte progress. */
+    uint64_t now = mono_ms();
+    if (pending && (pending == TRANSFER_BUFFER || eof || now - flushed >= 250)) {
+      if (!transfer_write(fd, buffer, pending)) { ok = 0; break; }
+      pending = 0; flushed = now;
+      if (eof || total == expected || now - reported >= 200) {
+        pthread_mutex_lock(&ds_shared.mu);
+        ds_shared.byte_done = total;
+        pthread_mutex_unlock(&ds_shared.mu);
+        reported = now;
+      }
+    }
+    if (eof) {
+      pthread_mutex_lock(&ds_shared.mu);ds_shared.byte_done = total;pthread_mutex_unlock(&ds_shared.mu);
       break;
-    total += n;
-    if (total - reported >= 256 * 1024 || total == expected) {
-      pthread_mutex_lock(&ds_shared.mu);
-      ds_shared.byte_done = total;
-      pthread_mutex_unlock(&ds_shared.mu);
-      reported = total;
     }
   }
+  free(buffer);
   close(pipes[0]);
   if (!ok)
     kill(child, SIGKILL);

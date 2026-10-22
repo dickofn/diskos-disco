@@ -29,6 +29,7 @@ typedef struct {
   item_t picks[PICKS];
   int npicks, replace;
   int64_t byte_done, byte_total;
+  unsigned transfer_serial; /* Distinguishes consecutive files of equal size. */
   request_t req;
   int command;
 } shared_t;

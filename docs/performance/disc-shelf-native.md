@@ -78,3 +78,31 @@ This does not measure peak device RSS or physical battery consumption.
 Final SMB3 test payload: 6,373,628 bytes, versus 6,219,588 for the previous native Disc Shelf payload: +154,040 bytes (150.4 KiB). MIPS ELF text/data/BSS for the preceding equivalent link were 6,297,212 / 72,964 / 4,456,344 bytes, versus 6,146,656 / 71,668 / 4,430,512 for the native baseline. Fixed BSS increased about 25.2 KiB; actual peak RSS/current draw require hardware measurements. Source changes also include the reviewed layout/icon/typography fixes.
 
 Protocol work is confined to the existing on-demand worker. Directory query buffers are bounded to 64 KiB, file reads to 32 KiB, and UI data stays at 32 rows. Idle SMB workers wait on the existing condition variable. There is no automatic discovery, keepalive, sync or refresh timer. Session/password and source-selection details are documented in `docs/plans/disc-shelf-smb3.md`.
+
+## Download display and buffered Navidrome writes
+
+- Download status uses at most three lines with ellipsis, smaller percentage plus
+  a four-sample rolling speed, and a larger transferred/total MiB line. Native
+  LVGL fixtures cover Disco, Null and Squash; displayed fixture speed is synthetic.
+- Speed reads existing byte counters only while the screen is visible. A per-file
+  serial resets its samples even for consecutive equal-size files. No new timer,
+  network request, directory scan or idle worker is added.
+- Navidrome now coalesces small wget pipe reads in a 128 KiB temporary heap buffer
+  instead of writing each read immediately (previous stack buffer: 32 KiB).
+  Partial buffers flush after a 250 ms threshold (observed within 306 ms in the
+  stalled-sender test, plus possible scheduler/storage delay) and at EOF.
+  The allocation is freed on all transfer exits. No increased worker stack.
+- Resource checks remain at the existing 1 MiB cadence, cancellation is checked
+  before each loop and partial write, expected-size/media checks remain, and final
+  fsync/atomic publication are unchanged. Progress publication is limited to about
+  five updates per second plus completion, rather than every small read.
+- `python3 ui/tests/discshelf/transfer_buffer_test.py` verifies byte-exact output
+  including a short final buffer, short writes, EINTR, ENOSPC, cancellation,
+  SD/resource failure and partial-buffer flushing while the sender stalls.
+  Optional `SHELF_BASELINE_NET=/path/to/old/net.c` compares write-call counts.
+- A 10 MiB + 18 byte localhost transfer made 81 SD-file write calls versus 326
+  before (75.2% fewer in that run). Both runs took approximately 0.035 seconds:
+  this proves batching, **not an on-device throughput improvement**. Actual speed,
+  power and battery effects require measurement on the Disc with the same server,
+  track and SD card. This patch adds no rate limit or parallel downloads, does not
+  change SMB read sizes, and does not remove durability or space-reserve checks.
