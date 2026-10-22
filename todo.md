@@ -50,6 +50,10 @@ Links always point to releases/latest. No upstream diskOS version shown to users
   R13 -O2 experiment (measure on the Disc first).
 
 ## Minor
+- 2.6.2 review follow-ups: confirm on the Disc that the kernel lists Bluetooth connections as
+  /sys/class/bluetooth/hci0:<n> (the codec fallback and safe restarts rely on it; without it they never restart
+  BlueALSA); measure screen-off current with a stable and a flaky link; shutdown_test.py no longer builds (missing
+  stats_flush stub), like transport_test.py.
 - From the Bluetooth audit and the delayed-pause report, not done yet: richer command logging (origin, queued vs
   delivered, telemetry age) for the next device trace; B08 a persistent pairing agent (check on the Disc first whether FiiO's
   software already provides one; first pairings seem to work); B09 device details/forget off the screen's thread
