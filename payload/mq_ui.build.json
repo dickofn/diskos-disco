@@ -1,13 +1,13 @@
 {
   "version": "2.7.0",
-  "revision": "Post-2.7.0 test: scoped Wi-Fi power-save override during Disc Shelf copy jobs",
-  "baseline": "v2.7.0",
-  "source_commit": "b82818428163d27e2393f22c3a831e025373c912",
+  "revision": "Disco 2.7.0: native Disc Shelf Navidrome/SMB3, scoped copy Wi-Fi power-save guard, app previews, download speed and Shuffle!",
+  "baseline": "v2.6.2",
+  "source_commit": "ac1e1ce336f779cf35977243539e0d272713d57c",
   "ui_source_sha256": "58ef14e270473f116d6813dc1ea6f317c1a13003f40b78399b81611c3c8a0e0e",
   "ui_source_hash_recipe": "sorted tracked ui paths: path + NUL + file bytes + NUL",
   "compiler": "Repository prebuilt toolchain-gcc11.2: GCC 11.2.0, musl 1.2.6",
   "abi": "static little-endian MIPS32r2, o32, FP64, NaN2008",
-  "status": "FOLLOW-UP TEST BUILD. Fake wl policy/error/timeout tests and Navidrome/SMB3 regressions passed. Real-driver override/restore remains to be tested. Existing v2.7.0 tag is unchanged; version string remains 2.7.0.",
+  "status": "2.7.0 stable-channel release package. Host PM policy/error/timeout, Navidrome/SQLite, SMB3 wire, lifecycle and LVGL tests passed. Real-driver PM restore, independent NAS compatibility and power/peak memory remain device-validation items. No Bluetooth changes.",
   "binary": {
     "sha256": "54687764b1280a9a53a4661059277a32a0d6494addafc4870c0871bdad76af36",
     "md5": "de0f40c3ac55d6e6be4fda0bddc5f07e",
@@ -23,5 +23,5 @@
     "commit": "2bcb014b23a8c8cccf534eea8bda2fe5df453cfd",
     "license": "LGPL-2.1-or-later"
   },
-  "baseline_commit": "d6a06853874b4bd9b3a443bf65aeb2751a1b9d93"
+  "baseline_commit": "e8b3b3a1cf47a5e9b2fd46639c3bacd249d82213"
 }
