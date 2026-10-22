@@ -1,16 +1,16 @@
 {
   "version": "2.6.2",
-  "revision": "Disc Shelf SMB3 development test: exclusive Navidrome/SMB source choice, safe folder/file downloads, session-only credentials and themed native UI",
+  "revision": "Disc Shelf development test: batched Navidrome SD writes, three-line download status and smoothed speed display",
   "baseline": "v2.6.2",
-  "source_commit": "4a048e892790b05bd6d68d7314c926414565e1d2",
-  "ui_source_sha256": "22d1bed1d0bda6db7c49a7b3894f4be1d3ee6e8e6bf6a223d579d49a7d8be7b4",
+  "source_commit": "bb3c5d12fe018601f9b602cf13a4dff781be283b",
+  "ui_source_sha256": "67536bc3a6fd368ae82b58f9ab3174d2bea12b77ad50027f5f3389fc032322c8",
   "ui_source_hash_recipe": "sorted tracked ui paths: path + NUL + file bytes + NUL",
   "compiler": "Repository prebuilt toolchain-gcc11.2: GCC 11.2.0, musl 1.2.6",
   "abi": "static little-endian MIPS32r2, o32, FP64, NaN2008",
-  "status": "DEVELOPMENT TEST BUILD. SMB3 wire-fixture, Navidrome, credential, lifecycle and LVGL tests passed. Physical Disc/NAS compatibility, memory and power measurements pending. No Bluetooth changes. No release tag.",
+  "status": "DEVELOPMENT TEST BUILD. HTTP/SQLite regressions, buffered-transfer fault tests and three-theme LVGL renders passed. On-device speed improvement is unmeasured. No new release tag or Bluetooth changes.",
   "binary": {
-    "sha256": "a47724e503772eb1b57916633b1a748b5fb56cdd816a1171b9fccea47a564f98",
-    "md5": "4cbec02cf038a77fd39f1548e909fe02",
+    "sha256": "57de2253b3b853f0ad6d1a1076318d729d6e578cbc94ce151f11fb7d421e96ea",
+    "md5": "2f736f1485ed1e8af47e6a4dacacb24f",
     "bytes": 6373628
   },
   "artwork_helper": {
