@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
 extern char ds_server[1024],ds_username[256],ds_password[256],ds_download_root[1024],ds_state_dir[1100];
@@ -61,7 +62,7 @@ static int connect_share(smb_state_t*s){
 static int sql(smb_state_t*s,const char*q){return sqlite3_exec(s->db,q,NULL,NULL,NULL)==SQLITE_OK;}
 static int component(const char*n){if(!*n||!strcmp(n,".")||!strcmp(n,"..")||strchr(n,'/')||strchr(n,'\\'))return 0;for(const unsigned char*p=(const void*)n;*p;p++)if(*p<32||*p==127)return 0;return 1;}
 static int safe_path(const char*p){
- if(!p||strlen(p)>=PATHCAP||*p=='/'||strchr(p,'\\'))return 0;if(!*p)return 1;
+ if(!p||strlen(p)>=PATHCAP||*p=='/'||strchr(p,'\\')||!strcmp(p,".shelf")||!strncmp(p,".shelf/",7))return 0;if(!*p)return 1;
  const char*a=p;while(*a){const char*b=strchr(a,'/');size_t n=b?(size_t)(b-a):strlen(a);if(!n||(n==1&&a[0]=='.')||(n==2&&a[0]=='.'&&a[1]=='.'))return 0;for(size_t i=0;i<n;i++)if((unsigned char)a[i]<32||(unsigned char)a[i]==127)return 0;if(!b)return 1;a=b+1;if(!*a)return 0;}return 1;
 }
 static int resolve(smb_state_t*s,const char*id,char*path){
@@ -74,6 +75,7 @@ static int save_entry(smb_state_t*s,const char*name,const struct smb2_fileidfull
  if(!strcmp(name,".")||!strcmp(name,".."))return 1;
  if(!component(name)){ds_status_text("Folder contains an unsupported file name.");return 0;}
  if(f->file_attributes&SMB2_FILE_ATTRIBUTE_REPARSE_POINT)return 1;
+ if(!s->listing[0]&&!strcmp(name,".shelf"))return 1;
  int dir=!!(f->file_attributes&SMB2_FILE_ATTRIBUTE_DIRECTORY);char path[PATHCAP];
  if(strlen(name)>=STR||snprintf(path,sizeof path,"%s%s%s",s->listing,s->listing[0]?"/":"",name)>=(int)sizeof path||!safe_path(path)){ds_status_text("A name or path is too long. Folder was not loaded.");return 0;}
  if(f->end_of_file>INT64_MAX)return 0;
@@ -146,6 +148,16 @@ static int publish(smb_state_t*s,request_t r){
 }
 static int stat_remote(smb_state_t*s,struct smb2fh*fh,struct smb2_stat_64*st){begin(s);return smb2_fstat_async(s->client,fh,st,rpc_cb,s)>=0&&wait_rpc(s);}
 static int stable(const struct smb2_stat_64*a,const struct smb2_stat_64*b){return a->smb2_type==SMB2_TYPE_FILE&&b->smb2_type==SMB2_TYPE_FILE&&a->smb2_ino==b->smb2_ino&&a->smb2_size==b->smb2_size&&a->smb2_mtime==b->smb2_mtime&&a->smb2_mtime_nsec==b->smb2_mtime_nsec;}
+/* FAT/exFAT cards cannot hard-link. Prefer Linux's atomic no-replace rename;
+ * use a link only on filesystems lacking that rename operation. Never replace
+ * an unrelated target as a portability fallback. */
+static int publish_new(int dir,const char*tmp,const char*name){
+#ifdef SYS_renameat2
+ if(syscall(SYS_renameat2,dir,tmp,dir,name,1u)==0)return 1;
+ if(errno!=ENOSYS&&errno!=EINVAL&&errno!=EOPNOTSUPP)return 0;
+#endif
+ return linkat(dir,tmp,dir,name,0)==0;
+}
 static int download_file(smb_state_t*s,const char*path,int replace,int*saved,int*kept){
  if(!connect_share(s)||!safe_path(path))return 0;
  begin(s);if(smb2_open_async(s->client,path,O_RDONLY,rpc_cb,s)<0||!wait_rpc(s))return 0;struct smb2fh*fh=s->result;struct smb2_stat_64 before={0},after={0};
@@ -153,7 +165,7 @@ static int download_file(smb_state_t*s,const char*path,int replace,int*saved,int
  char name[STR],tmp[80]={0};int dir=-1,fd=-1,temp_owned=0;struct stat old={0};int exists=0,skip=0,was_owned=0;
  if(ok){dir=parent_fd(path,1,name);ok=dir>=0;}
  if(ok){if(fstatat(dir,name,&old,AT_SYMLINK_NOFOLLOW)==0){exists=1;ok=S_ISREG(old.st_mode);was_owned=ok&&owned(s,path,&old,-1,0,0);skip=ok&&(!replace||!was_owned);}else if(errno!=ENOENT)ok=0;}
- if(ok&&!skip){ok=ds_available_memory()&&ds_storage_headroom(before.smb2_size);if(ok){for(int n=0;n<20;n++){snprintf(tmp,sizeof tmp,".shelf-%ld-%d.part",(long)getpid(),n);fd=openat(dir,tmp,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);if(fd>=0)break;if(errno!=EEXIST)break;}ok=fd>=0;temp_owned=ok;}}
+ if(ok&&!skip){ok=ds_available_memory()&&ds_storage_headroom(before.smb2_size);if(ok){for(int n=0;n<20;n++){snprintf(tmp,sizeof tmp,".shelf-%ld-%d.part",(long)getpid(),n);if(!strcmp(tmp,name))continue;fd=openat(dir,tmp,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);if(fd>=0)break;if(errno!=EEXIST)break;}ok=fd>=0;temp_owned=ok;}}
  if(ok&&!skip){
   ds_status_text("Downloading %s",name);uint64_t pos=0;
   pthread_mutex_lock(&ds_shared.mu);ds_shared.byte_done=0;ds_shared.byte_total=before.smb2_size;pthread_mutex_unlock(&ds_shared.mu);
@@ -166,7 +178,7 @@ static int download_file(smb_state_t*s,const char*path,int replace,int*saved,int
  if(ok&&!skip){
   struct stat check;
   if(exists)ok=!fstatat(dir,name,&check,AT_SYMLINK_NOFOLLOW)&&S_ISREG(check.st_mode)&&check.st_dev==old.st_dev&&check.st_ino==old.st_ino&&check.st_size==old.st_size&&check.st_mtim.tv_sec==old.st_mtim.tv_sec&&check.st_mtim.tv_nsec==old.st_mtim.tv_nsec&&renameat(dir,tmp,dir,name)==0;
-  else ok=linkat(dir,tmp,dir,name,0)==0;
+  else ok=publish_new(dir,tmp,name);
   if(ok)ok=fsync(dir)==0;
   if(ok){sqlite3_stmt*q=NULL;ok=sqlite3_prepare_v2(s->db,"INSERT OR REPLACE INTO downloads VALUES(?,?,?,?,?)",-1,&q,NULL)==SQLITE_OK;if(ok){sqlite3_bind_text(q,1,s->source,-1,SQLITE_STATIC);sqlite3_bind_text(q,2,path,-1,SQLITE_STATIC);sqlite3_bind_int64(q,3,before.smb2_size);sqlite3_bind_int64(q,4,before.smb2_mtime);sqlite3_bind_int64(q,5,before.smb2_mtime_nsec);ok=sqlite3_step(q)==SQLITE_DONE;}sqlite3_finalize(q);if(ok)(*saved)++;}
  }
