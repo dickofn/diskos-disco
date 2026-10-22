@@ -37,16 +37,15 @@
 > a power cut, a bad cable or an interrupted flash can leave it unbootable. Back up your music and keep the
 > saved stock image somewhere safe before you start. Not affiliated with FiiO, Snowsky or Ingenic.
 
-## New in 2.6.2
+## New in 2.7.0
 
-**Bluetooth, polished.** Headphones connect straight on AAC or LDAC, with no switch and no pause, once Disco knows
-them, and are remembered with the codecs that really work on them. A clear pop-up says what connected and on which
-codec ("Connected: FiiO EH11 / LDAC"), and the Bluetooth screen has a cleaner look: one "Connected to ..." line,
-bigger rows and larger text, and it updates as soon as headphones come or go.
+**Your music, to go.** Disc Shelf is now built in. Browse a Navidrome library or an SMB3 share, select what you want and download original files to the card. It follows Disco, Null and Squash, with familiar swipe selection and both letter pickers. Nothing syncs while the app is closed.
 
-Also new: a larger, clearer clock field on Disco, Squash and Null, with an optional battery percentage and an
-optional weather line (Settings › Display › Music screen › Music information › Clock and info).
-[See what’s new](docs/releases/v2.6.2.md).
+**Hold. Shuffle. Listen.** Set your menu hold action to **Shuffle!** to start the whole song library, return to Music and see “Happy listening!”. SongSphere also gets a themed preview with an explicit Open button, so browsing past it keeps you in control.
+
+Downloads now show clearer progress and speed. Batched SD writes reduce small-write overhead; an actual transfer-speed gain depends on your card and network. Navidrome has been tried on the Disc; SMB3 remains experimental pending real NAS testing.
+
+[What’s new](docs/releases/v2.7.0.md) · [Set up Disc Shelf](docs/DISC_SHELF_INSTALL.md) · [Quick how-to](docs/HOWTO.md)
 
 ## Big. Bold. Squash.
 

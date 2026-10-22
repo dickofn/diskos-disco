@@ -186,3 +186,16 @@ The optional standalone Disc Shelf app is GPL-3.0-or-later. Exact corresponding 
 Null's optional music typography includes Jersey 10, Pixelify Sans, Handjet and VT323
 from the Google Fonts repository (SIL Open Font License 1.1). Font sources, exact
 licence texts and the glyph generator are in `ui/fonts/null/jersey/`.
+
+## Native Disc Shelf and libsmb2 (Disco 2.7.0)
+
+Disc Shelf’s native integration is part of the GPL-3.0-or-later UI. The separate
+1.0.4 archive above remains a legacy download; it is not needed on 2.7.0.
+
+SMB3 uses libsmb2 6.3, upstream commit
+`2bcb014b23a8c8cccf534eea8bda2fe5df453cfd`, under LGPL-2.1-or-later.
+Unmodified corresponding source and upstream notices/licence texts are retained
+in `ui/vendor/libsmb2/`; the compile recipe is `ui/tools/build_smb.py`.
+The full tagged repository supplies the UI and library sources needed to rebuild
+and relink this static executable; use the repository toolchain/build guide.
+No SMB server, Kerberos or discovery utility is included in the firmware.

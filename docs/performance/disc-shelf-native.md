@@ -1,7 +1,7 @@
 # Native Disc Shelf integration: validation
 
 Development branch based on public Disco 2.6.2 (`e8b3b3a`). No Bluetooth, power-button or timeout-lock changes.
-This is a test build pending physical Disc acceptance, not a new published release/tag.
+Prepared for Disco 2.7.0. Navidrome has been exercised on the owner’s Disc; SMB3 physical NAS/device acceptance and power measurements remain pending.
 
 ## Implemented
 
@@ -50,8 +50,7 @@ where specified by each harness. Lifecycle release is checked explicitly rather 
 
 ## Scope and device acceptance
 
-The version string remains 2.6.2; this is a Disc Shelf development build, not the public 2.6.2 payload. No tag was moved
-and nothing was pushed. Build records and delivery notes identify the source commit and binary hashes.
+The release version is 2.7.0, built from public 2.6.2 plus the changes recorded here. Earlier size/host results below describe intermediate development payloads, not a guarantee of physical-device compatibility. Build records identify final source and binary hashes. Nothing is pushed by the local packaging process.
 
 On a Disc, test your real Navidrome catalogue, Wi-Fi failure/recovery, a partial album, an explicit redownload,
 card removal/full-card handling, cancellation, repeated open/close, normal playback and switching to USB storage.

@@ -4,6 +4,29 @@ Short answers for everyday tasks. For a walk through every screen, see the [tour
 
 [Home](../README.md) | [Tour](DISCO_TOUR.md) | [Docs](README.md)
 
+## Bring music to the card with Disc Shelf
+
+Disc Shelf is built in from **2.7.0**. Open it from the menu or All apps, then press **Open Disc Shelf**.
+Choose **Server**, select **Navidrome** or **SMB3**, enter the connection details and save. Only one source connects at a time.
+
+Browse your collection or share, then **swipe from the middle of a row to select**. Pick tracks, albums, artists, files or folders as appropriate and press **Download**. **Missing only** keeps existing files; **Download again** replaces only matching copies recorded by Disc Shelf. Partial albums can be finished without replacing what is already there. Use Disco’s normal indexing after downloading new music.
+
+The circles show local presence; a selected missing item has a check, and an already synced selected item has an SD-card marker. Both letter pickers work. Downloads show file progress, MiB and a rolling speed. Nothing syncs with the app closed.
+
+**SMB3 is experimental.** Remember password Off keeps it for the session only. On stores readable credentials in a private file. See the [full setup and privacy guide](DISC_SHELF_INSTALL.md).
+
+## One hold, a fresh shuffle
+
+Open **Settings > Display > Navigation > Gestures > Menu hold**, choose **Shuffle!**, and apply if offered.
+Hold your theme’s open menu control: Disco’s centre icon, Null’s handle centre, or Squash’s D! / large launcher icon.
+It starts the **full song library** in shuffle mode, returns to Music and briefly shows **“Happy listening!”**.
+It does not depend on the last album/artist view. The shared picker also offers Shuffle! for menu double-tap.
+Existing assignments stay as you set them.
+
+## Open SongSphere when you are ready
+
+Browsing to SongSphere now shows a themed preview. Press **Open SongSphere** to reach its existing Place Music and Play Music controls. Direct Mood/tag actions from a track, album or artist still open the relevant editor immediately.
+
 ## Squash quick start
 
 Select **Settings > Display > Theme > Squash**. Squash uses the same Display menu as every theme; options that

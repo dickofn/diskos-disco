@@ -55,3 +55,7 @@ Switched to Disco from upstream diskOS or another build, and something looks or 
 - [License](../LICENSE), [UI license](../ui/COPYING), [third-party notice](../NOTICE.md), [license texts](../licenses/README.md).
 - [SPL source and DDR parameter provenance](../SPL_SOURCE.md), [onefile dependencies](../build/ONEFILE_DEPENDENCIES.md).
 - [Security reporting](../SECURITY.md).
+
+## Latest release
+
+[Disco 2.7.0: Disc Shelf, Shuffle! and themed app previews](releases/v2.7.0.md).

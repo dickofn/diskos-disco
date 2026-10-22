@@ -17,8 +17,9 @@ build if the trial fails.
 > update can't replace. Flash with the same `--ota-key` as before (step 1); after that, SD updates work as below.
 > Already on 1.4.1 or later? Every newer release is an ordinary SD update.
 
-An SD update changes `mq_ui` (the interface) only. It doesn't touch the stock player, the boot scripts or the
-optional app ([Disc Shelf](DISC_SHELF_INSTALL.md)). A downloaded
+An SD update changes `mq_ui` (the interface), including built-in apps such as
+[Disc Shelf](DISC_SHELF_INSTALL.md) from 2.7.0. It does not replace the stock player,
+boot scripts or separately installed legacy apps. A downloaded
 `mq_ui` is **not** signed with your keys yet; you sign it yourself (step 3).
 
 ## Before you start

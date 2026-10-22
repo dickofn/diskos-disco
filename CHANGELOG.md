@@ -6,6 +6,32 @@ Entries follow the Keep a Changelog format, with Added, Changed, and Fixed categ
 diskOS remains beta software; version numbers do not imply broad hardware or feature validation.
 
 
+## [2.7.0] - 2026-10-22
+
+### Added
+- Native Disc Shelf, with exclusive Navidrome/SMB3 source selection and separate profiles.
+- Themed Library-style rows, swipe selection with Download-only actions, pagination/position dots, A–Z grid and letter wheel, and a first-use gesture hint.
+- Recursive SMB3 file/folder downloads, including partial collections, Unicode names and empty files/folders. SMB3 encryption is required; SMB1/2 are not used.
+- Missing-only downloads and explicit replacement of copies owned by the same source. Unrelated local files remain protected.
+- Session-only passwords by default, optional remembered credentials, native masked input and private configuration writes.
+- Themed guard screens for Disc Shelf and SongSphere; browsing past them does not initialize their apps.
+- Shuffle! menu action in Disco, Null and Squash: use Library’s all-songs shuffle, return to Music and show the themed Happy listening! popup.
+
+### Changed
+- Disc Shelf’s own CD-in-jewel-case icon, wider rows, aligned headers, smaller list type and selected-name scrolling.
+- Squash Settings headings align with the back arrow; the arrow is slightly further inward.
+- Download status is limited to three lines with ellipsis, with a smaller percentage, smoothed speed and a larger MiB counter.
+- Navidrome coalesces small pipe packets into 128 KiB SD writes. A localhost test made about 75% fewer file-write calls; this is not a measured on-device speed gain.
+- Navidrome authentication uses a random salted token. Tokens remain reusable credentials; HTTP and helper process arguments are not private.
+- Updated website, how-to, setup, tour, privacy and release documentation. Legacy standalone Disc Shelf remains a separate older-firmware download.
+
+### Validation
+- Navidrome works on the owner’s Disc. Host HTTP/SQLite, transfer-fault, native lifecycle, source/credential and themed LVGL checks cover the new paths.
+- SMB3’s encrypted wire fixture passed, but independent physical NAS compatibility, device power/peak memory and hot-card removal remain unverified. SMB3 is experimental.
+- No Bluetooth or upstream-settings migration changes relative to public 2.6.2. Existing menu action numbers remain compatible.
+
+[2.7.0 release notes](docs/releases/v2.7.0.md)
+
 ## [2.6.2] - 2026-10-21
 
 - Bluetooth: headphones known to support the chosen codec connect straight on AAC or LDAC (BlueALSA started preferring

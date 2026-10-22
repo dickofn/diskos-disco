@@ -1,6 +1,6 @@
 # Disc Shelf: themed firmware integration plan
 
-Status: implemented in the native Disc Shelf development branch; device acceptance pending. See docs/performance/disc-shelf-native.md for validation and remaining limits.
+Status: shipped in Disco 2.7.0, including the SMB3 follow-up. Navidrome has been used on the owner’s Disc; independent SMB3 NAS/device acceptance remains pending. See docs/performance/disc-shelf-native.md for validation and remaining limits.
 Baseline: public Disco 2.6.2, e8b3b3a1cf47a5e9b2fd46639c3bacd249d82213, with bundled Disc Shelf 1.0.4 corresponding source.
 Scope: native Disc Shelf, compact Library-style browsing, existing selection gestures and letter seeking, downloads only. Excludes the earlier Bluetooth patch and timeout-lock proposal.
 

@@ -740,8 +740,7 @@ local-presence indication; selected tracks show a check, and selected local trac
 
 Both letter pickers and the usual list-position indicator are available. Nothing syncs in the background when the
 app is closed. Your old server configuration is preserved; new settings can be entered with the firmware keyboard.
-See [setup and older-firmware instructions](DISC_SHELF_INSTALL.md). This development feature is based on 2.6.2;
-the public 2.6.2 binary still uses the standalone app.
+See [setup and older-firmware instructions](DISC_SHELF_INSTALL.md). Built in from 2.7.0. The standalone archive is only for older firmware. SMB3 remains experimental pending independent NAS/device testing.
 
 
 <table>
