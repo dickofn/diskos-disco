@@ -3,6 +3,8 @@
 Read this first, then `todo.md` (the live list). Older release-by-release notes follow below as history.
 
 ## Where things are
+- 2.6.2 (2026-10-21): BlueALSA started preferring the chosen codec for known headphones (btcaps_<mac>, bt_born_for,
+  bt_codec_prepare_for); 2.6.1 was released at c615d54 (its build record's version was fixed on GitHub, 6a0c70e).
 - 2.6.1 (2026-10-21): auto-route link probe time-outs are unknown, three completed empty probes forget the route
   (2.6.0's B01 change dropped headphones via a re-route's 06c1). 2.6.0 was released at da46c0f.
 - 2.6.0 (2026-10-21): t1/t2 test work (crash log crashlog.c, skip pacing, cover settle, history after 1 s), hints and

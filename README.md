@@ -37,11 +37,11 @@
 > a power cut, a bad cable or an interrupted flash can leave it unbootable. Back up your music and keep the
 > saved stock image somewhere safe before you start. Not affiliated with FiiO, Snowsky or Ingenic.
 
-## New in 2.6.1
+## New in 2.6.2
 
-**Fixes Bluetooth headphones dropping mid-song**, and the Disc powering off in Bluetooth DAC mode or while plugged in. 2.6.0 brought smoother fast skipping, a steadier Bluetooth
-with LDAC → AAC → SBC, up-to-date help and a crash log. [See what’s new](docs/releases/v2.6.1.md) ·
-[2.6.0](docs/releases/v2.6.0.md).
+**Bluetooth headphones connect straight on AAC or LDAC**, with no switch and no pause, once Disco knows them. 2.6.1
+fixed headphones dropping mid-song and the Disc powering off in Bluetooth DAC mode or while plugged in.
+[See what’s new](docs/releases/v2.6.2.md).
 
 ## Big. Bold. Squash.
 

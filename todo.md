@@ -1,10 +1,13 @@
 # diskOS Disco! - to do
 
-Live list. Released: 2.6.1 (tag v2.6.1). Older notes: `todo-history.md`.
+Live list. Released: 2.6.2 (tag v2.6.2). Older notes: `todo-history.md`.
 How we work: owner suggests -> Claude offers fixes -> host renders for big visual changes -> owner's go ->
 batch -> one test build -> a few days on the Disc -> one release, one bundle, owner pushes + tags.
 List words: "add to the list" pins an item; "major" / "minor" sorts it; "priority" puts it first.
 Links always point to releases/latest. No upstream diskOS version shown to users.
+
+## Released: 2.6.2 (2026-10-21)
+- Born on the right codec: tested by hand on the owner's Disc (LDAC), automatic version covered by bt_born_test only.
 
 ## Released: 2.6.0 (2026-10-21)
 - Fast-skipping work (pacing, cover settle, history after 1 s) and the crash log tested on the owner's Disc; the
@@ -16,18 +19,6 @@ Links always point to releases/latest. No upstream diskOS version shown to users
   with LDAC/AAC headphones by us; the reporter to confirm.
 
 ## Queued for 2.7.0 (owner, 2026-10-21; build when the owner says)
-- **Bluetooth: born on the right codec, no switch** (owner, 2026-10-21; tested by hand on the owner's Disc). Facts:
-  BlueALSA is v4.0.0 and the running instance is Disco's own (same arguments, early PID) - the code's note that the
-  player kills and relaunches BlueALSA on every route doesn't match the Disc. `--codec=sbc` only enables SBC; AAC
-  and LDAC are always available, and at connection BlueALSA picks the first enabled codec in its own order, SBC
-  first. Started with `--codec=-sbc`, the owner's headphones connected straight on LDAC ("Available codecs: AAC
-  LDAC", "Selected codec: LDAC"), and it stayed LDAC through Disco's route and playback.
-  Plan: remember each headphone's codec list (already parsed) per MAC; when Bluetooth starts and the last-used
-  headphones support the chosen codec, start BlueALSA preferring it (AAC chosen: -sbc -ldac; LDAC chosen: -sbc);
-  if no A2DP link appears within a few seconds after a connection (other or unknown headphones), restart BlueALSA
-  with the normal settings and today's switch path takes over; unknown headphones work as now and are learned.
-  Then the play deferral and codec hold only remain as the fallback. Owner's headphones support LDAC, so LDAC can be
-  tested on the Disc now (#13).
 - **Signing epoch:** switch the repo's `ui/tools/owner-keys/diskos-sign.sh` to a UTC timestamp to the second
   (YYYYMMDDHHMMSS; the Disc allows 18 digits). The minutes-since-2026 epoch is refused by Discs that accepted
   timestamp epochs from older scripts. The owner already uses the fixed copy.

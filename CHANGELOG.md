@@ -6,6 +6,14 @@ Entries follow the Keep a Changelog format, with Added, Changed, and Fixed categ
 diskOS remains beta software; version numbers do not imply broad hardware or feature validation.
 
 
+## [2.6.2] - 2026-10-21
+
+- Bluetooth: headphones known to support the chosen codec connect straight on AAC or LDAC (BlueALSA started preferring
+  it), so there's no switch and no pause; unknown headphones work as before and are learned; other headphones get the
+  normal order. Tested by hand on a Disc; the automatic version not yet.
+
+[2.6.2 release notes](docs/releases/v2.6.2.md)
+
 ## [2.6.1] - 2026-10-21
 
 - Bluetooth: headphones no longer drop mid-song. A late answer from the link check (busy Disc, screen off) is no
