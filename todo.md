@@ -50,6 +50,8 @@ Links always point to releases/latest. No upstream diskOS version shown to users
   R13 -O2 experiment (measure on the Disc first).
 
 ## Minor
+- Ask the owner: does Stone count as frozen like Ring and Braun, or get the Disco/Squash/Null changes (clock field)?
+- Null clock: a size up would need new pixel-font sizes (its fonts are fixed sets); not done in 2.6.2.
 - 2.6.2 review follow-ups: confirmed on the owner's Disc that the kernel lists Bluetooth connections as
   /sys/class/bluetooth/hci0:<n> (hci0:11 with headphones connected), so the codec fallback and the safe restarts
   work there; still to do: measure screen-off current with a stable and a flaky link; shutdown_test.py no longer builds (missing

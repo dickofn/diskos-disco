@@ -368,6 +368,8 @@ static const char *OPT_NULLBG[]={"Black","Dark cover","Pixel cover"};
 static const char *OPT_NULLAUTO[]={"Off","5 seconds","10 seconds","30 seconds"};
 static void apply_grp_musictext(int v);
 static void apply_grp_musicinfo(int v);
+static void apply_grp_clockinfo(int v);
+static void apply_clockinfo(int v){ (void)v; void dhome_clockinfo_apply(void); void null_clockinfo_apply(void); dhome_clockinfo_apply(); null_clockinfo_apply(); }
 static void apply_grp_musicprogress(int v);
 static void apply_grp_immersive(int v);
 static void apply_grp_themecolours(int v);
@@ -882,6 +884,12 @@ static const setting_t TABLE[] = {
       "List uses rows; Arc uses round buttons with Wi-Fi in the middle. Both keep the music disc.", NULL },
     { "Quick Settings", "Items", ST_ACTION, NULL,0,0,0,NULL,0,LV_SYMBOL_RIGHT,apply_disco_qs_items,0,
       "Add, remove and reorder quick actions with the Disco Menu editor.", NULL },
+    { "Clock and info", "Clock and info", ST_ACTION, NULL, 0,0,0, NULL,0, LV_SYMBOL_RIGHT, apply_grp_clockinfo, 0,
+      "Battery percentage and weather beside the clock.", NULL },
+    { "Clock and info", "Battery percentage", ST_TOGGLE, "clock_batt_pct", 0,1,0, NULL,0, NULL, apply_clockinfo, 1,
+      "Show the battery level as a number (67%) next to the battery icon above the clock.", NULL },
+    { "Clock and info", "Weather", ST_TOGGLE, "clock_weather", 0,1,1, NULL,0, NULL, apply_clockinfo, 1,
+      "Show the weather under the clock. Off: tapping the clock no longer opens Weather.", NULL },
     { "Music Screen", "Show Clock", ST_TOGGLE, "disco_clock", 0,1,1, NULL,0, NULL, apply_disco_clock, 1,
       "Show the clock, weather and temperature over the cover on Music.", NULL },
     { "Music Screen", "Track Times", ST_TOGGLE, "disco_times", 0,1,1, NULL,0, NULL, apply_disco_times, 1,
@@ -1148,6 +1156,7 @@ static lv_obj_t *g_setlist_root;            /* SCR_SETLIST root: one category's 
 static const char *g_active_group;          /* which category SCR_SETLIST is currently showing */
 static void apply_grp_musictext(int v){(void)v;g_active_group="Music text";setlist_refresh();}
 static void apply_grp_musicinfo(int v){(void)v;g_active_group="Music info";setlist_refresh();}
+static void apply_grp_clockinfo(int v){(void)v;g_active_group="Clock and info";setlist_refresh();}
 static void apply_grp_musicprogress(int v){(void)v;g_active_group="Music progress";setlist_refresh();}
 static void apply_grp_immersive(int v){(void)v;g_active_group="Immersive";setlist_refresh();}
 static void apply_null_options(int v){(void)v;g_active_group="Navigation";setlist_refresh();}
@@ -1185,6 +1194,7 @@ static const struct { const char *child, *parent; } SUBGROUP[] = {
     { "Quick settings", "Navigation" },
     { "Music text", "Music screen" },
     { "Music info", "Music screen" },
+    { "Clock and info", "Music info" },
     { "Music progress", "Music screen" },
     { "Immersive", "Music screen" },
     { "Power", "System" },

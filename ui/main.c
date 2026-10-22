@@ -3008,6 +3008,10 @@ static void back_hint_at(int y, int dx, int mirrored){
     if(y > 290) y = 290;
     int bx = -64 + 8 + reach * 40 / (thresh * 3 / 2);
     lv_obj_set_pos(g_bh, (mirrored ? 360-bx-64 : bx), y - 32);                     /* Disco Left: in from the right edge */
+    {   /* always frontmost while showing: overlays on the same layer (the track popup) can rise above it (2.6.2) */
+        lv_obj_t *par = lv_obj_get_parent(g_bh);
+        if(par && lv_obj_get_index(g_bh) != (int32_t)lv_obj_get_child_count(par) - 1) lv_obj_move_foreground(g_bh);
+    }
     static int was = -1;                                     /* restyle only when it arms / disarms, not per touch sample */
     if(lv_obj_has_flag(g_bh, LV_OBJ_FLAG_HIDDEN)){ was = -1; lv_obj_remove_flag(g_bh, LV_OBJ_FLAG_HIDDEN); lv_obj_move_foreground(g_bh); }
     if(armed != was){

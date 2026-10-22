@@ -22,6 +22,8 @@
 
 extern const lv_font_t font_theme_20, font_theme_24;
 extern const lv_font_t font_weather16;
+extern const lv_font_t font_weather20;
+void dhome_clockinfo_apply(void);
 
 /* text over the cover: every label has a twin one pixel down-right in the opposite colour (a soft shadow), and the pair
  * flips between light-on-dark and dark-on-light with the brightness of the cover behind it (decided once per album) */
@@ -521,9 +523,14 @@ static void ov_swipe_cb(lv_event_t *e){
     if(code!=LV_EVENT_PRESSING && code!=LV_EVENT_RELEASED)return;
     int dx=p.x-ov_swipe_start.x,dy=p.y-ov_swipe_start.y;
     int mirrored=disco_mirror(),edge=mirrored?ov_swipe_start.x>=296:ov_swipe_start.x<=64;
-    extern int ui_get_swipe_thresh(void);
-    if(edge && (mirrored?-dx:dx)>=ui_get_swipe_thresh() && abs(dx)>2*abs(dy) && lv_tick_elaps(ov_swipe_at)<700){
-        onboarding_discovered(HINT_POPUP);lv_indev_wait_release(in);ov_close();
+    extern int ui_get_swipe_thresh(void); void ui_back_hint(int y,int dx);
+    int inward=mirrored?-dx:dx, sideways=edge && abs(dx)>2*abs(dy);
+    /* 2.6.2: the same back feedback as everywhere else - the arrow follows the finger and arms at the threshold, and the
+     * popup closes on release with the arrow armed (it used to close mid-swipe, with no arrow to see) */
+    if(code==LV_EVENT_PRESSING){ ui_back_hint(sideways?p.y:0, sideways?inward:0); return; }
+    ui_back_hint(0,0);
+    if(sideways && inward>=ui_get_swipe_thresh() && lv_tick_elaps(ov_swipe_at)<700){
+        onboarding_discovered(HINT_POPUP);ov_close();
     }
 }
 static void ov_swipe_bubble(lv_obj_t *o){
@@ -761,7 +768,9 @@ void dhome_title_apply(void){
 static lv_obj_t *g_top_hit;
 static void wx_cb(lv_event_t *e){
     lv_event_code_t c = lv_event_get_code(e);
-    if(c == LV_EVENT_SHORT_CLICKED && lv_event_get_target(e) == g_pill) weather_app_open();   /* not CLICKED: that follows a hold */
+    if(c == LV_EVENT_SHORT_CLICKED && lv_event_get_target(e) == g_pill){   /* not CLICKED: that follows a hold */
+        if(simple_cfg_get_int("clock_weather", 1)) weather_app_open();      /* weather hidden: the clock isn't a button */
+    }
     else if(c == LV_EVENT_LONG_PRESSED){
         int on = g_pill && lv_obj_has_flag(g_pill, LV_OBJ_FLAG_HIDDEN);   /* what is on screen decides, not a save that may have failed */
         simple_cfg_set_int("disco_clock", on); dhome_show_clock(on);
@@ -797,11 +806,12 @@ void dhome_create(lv_obj_t *root){
     g_pill = lv_obj_create(root); lv_obj_remove_style_all(g_pill);
     lv_obj_set_size(g_pill, 200, 110); lv_obj_align(g_pill, LV_ALIGN_TOP_MID, 0, 14);
     lv_obj_clear_flag(g_pill, LV_OBJ_FLAG_SCROLLABLE);
-    dl_make(g_pill, &L_STAT, TF(UI_14), -1, 0, LV_ALIGN_TOP_MID, 0, 4, 1);
-    g_time = dl_make(g_pill, &L_TIME, TF(UI_46), -1, 0, LV_ALIGN_TOP_MID, 0, 22, 0);
+    /* 2.6.2 clock field: icons, clock and weather a touch larger, all inside the 110 px field (title from y 136) */
+    dl_make(g_pill, &L_STAT, TF(UI_16), -1, 0, LV_ALIGN_TOP_MID, 0, 2, 1);
+    g_time = dl_make(g_pill, &L_TIME, TF(UI_48), -1, 0, LV_ALIGN_TOP_MID, 0, 20, 0);
     dl_text(&L_TIME, "--:--");
-    g_wfont = *theme_font_original(18); g_wfont.fallback = &font_weather16;
-    g_wx = dl_make(g_pill, &L_WX, &g_wfont, -1, 0, LV_ALIGN_TOP_MID, 0, 78, 1);
+    g_wfont = *theme_font_original(20); g_wfont.fallback = &font_weather20;
+    g_wx = dl_make(g_pill, &L_WX, &g_wfont, -1, 0, LV_ALIGN_TOP_MID, 0, 80, 1);
     g_top_hit = lv_obj_create(root); lv_obj_remove_style_all(g_top_hit);   /* under the clock: holds while it's hidden */
     lv_obj_set_size(g_top_hit, 200, 110); lv_obj_align(g_top_hit, LV_ALIGN_TOP_MID, 0, 14);
     lv_obj_add_flag(g_top_hit, LV_OBJ_FLAG_CLICKABLE); lv_obj_clear_flag(g_top_hit, LV_OBJ_FLAG_SCROLLABLE);
@@ -810,6 +820,7 @@ void dhome_create(lv_obj_t *root){
     lv_obj_add_flag(g_pill, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_pill, wx_cb, LV_EVENT_SHORT_CLICKED, NULL); lv_obj_add_event_cb(g_pill, wx_cb, LV_EVENT_LONG_PRESSED, NULL);
     if(!simple_cfg_get_int("disco_clock", 1)) lv_obj_add_flag(g_pill, LV_OBJ_FLAG_HIDDEN);
+    dhome_clockinfo_apply();
     /* title + artist across the wide middle; a tap opens the track overlay */
     g_trk = lv_obj_create(root); lv_obj_remove_style_all(g_trk);
     lv_obj_set_pos(g_trk, disco_mirror() ? 42 : 18, 136); lv_obj_set_size(g_trk, 300, 66);   /* clear of the shard, wider on the free side */
@@ -870,14 +881,26 @@ void dhome_set_weather(const char *s){
     }
     dl_text(&L_WX, o);
 }
+static int g_st_batt = -1, g_st_chg, g_st_wifi, g_st_bt;            /* the last status, for redrawing on a setting change */
 void dhome_set_status(int batt, int charging, int wifi, int bt){
+    g_st_batt = batt; g_st_chg = charging; g_st_wifi = wifi; g_st_bt = bt;
     char b[64] = ""; size_t n = 0;                                       /* the Disc's usual status row: Wi-Fi, BT, battery */
     if(wifi) n += (size_t)snprintf(b + n, sizeof b - n, LV_SYMBOL_WIFI "  ");
     if(bt)   n += (size_t)snprintf(b + n, sizeof b - n, LV_SYMBOL_BLUETOOTH "  ");
     const char *bs = charging ? LV_SYMBOL_CHARGE : batt >= 90 ? LV_SYMBOL_BATTERY_FULL : batt >= 65 ? LV_SYMBOL_BATTERY_3 :
                      batt >= 40 ? LV_SYMBOL_BATTERY_2 : batt >= 15 ? LV_SYMBOL_BATTERY_1 : LV_SYMBOL_BATTERY_EMPTY;
-    if(batt >= 0) snprintf(b + n, sizeof b - n, "%s", bs);
+    if(batt >= 0) n += (size_t)snprintf(b + n, sizeof b - n, "%s", bs);
+    if(batt >= 0 && n < sizeof b && simple_cfg_get_int("clock_batt_pct", 0))   /* Clock and info > Battery percentage */
+        snprintf(b + n, sizeof b - n, " %d%%", batt > 100 ? 100 : batt);
     dl_text(&L_STAT, b);
+}
+/* Clock and info changed: the percentage and the weather line; with the weather off, a tap on the clock does nothing */
+void dhome_clockinfo_apply(void){
+    if(!g_pill) return;
+    if(g_st_batt >= 0 || g_st_wifi || g_st_bt) dhome_set_status(g_st_batt, g_st_chg, g_st_wifi, g_st_bt);
+    int wx = simple_cfg_get_int("clock_weather", 1);
+    lv_obj_t *w[2] = { L_WX.fg, L_WX.sh };
+    for(int i = 0; i < 2; i++) if(w[i]){ if(wx) lv_obj_remove_flag(w[i], LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(w[i], LV_OBJ_FLAG_HIDDEN); }
 }
 void dhome_set_now_playing(const char *title, const char *artist, lv_color_t accent, bool playing){
     g_have = title != NULL;
@@ -1047,7 +1070,7 @@ static void simple_music_layout(void){
  g_acc=TC(ACCENT_PRIMARY);
  kit_keep(g_pill);kit_keep(g_trk);lv_obj_set_style_border_width(g_pill,0,0);lv_obj_set_style_bg_opa(g_pill,0,0);lv_obj_set_style_border_width(g_trk,0,0);lv_obj_set_style_bg_opa(g_trk,0,0);kit_keep(g_top_hit);lv_obj_set_align(g_pill,LV_ALIGN_TOP_LEFT);lv_obj_set_align(g_top_hit,LV_ALIGN_TOP_LEFT);
  lv_obj_set_pos(g_pill,80,14);lv_obj_set_size(g_pill,200,82);lv_obj_set_pos(g_top_hit,80,14);lv_obj_set_size(g_top_hit,200,82);
- simple_label_pair(&L_STAT,0,0,200,20,TF(UI_14));simple_label_pair(&L_TIME,0,24,200,32,TF(UI_28));simple_label_pair(&L_WX,0,60,200,22,&g_wfont);
+ simple_label_pair(&L_STAT,0,0,200,20,TF(UI_16));simple_label_pair(&L_TIME,0,20,200,35,TF(UI_30));simple_label_pair(&L_WX,0,56,200,26,&g_wfont);   /* 2.6.2: a touch larger, still inside the 82 px field */
  int aligned_left=simple_cfg_get_int("disco_title_al",0)==1;
  lv_obj_set_pos(g_trk,36,94);lv_obj_set_size(g_trk,288,136);
  simple_label_pair(&L_TITLE,0,0,288,92,TF(MUSIC_TITLE));simple_label_pair(&L_ARTIST,0,92,288,39,TF(MUSIC_ARTIST));lv_label_set_long_mode(L_ARTIST.fg,LV_LABEL_LONG_DOT);

@@ -3,6 +3,8 @@
 Read this first, then `todo.md` (the live list). Older release-by-release notes follow below as history.
 
 ## Where things are
+- Ring and Braun are frozen (owner, 2026-10-21): fixes that apply to every theme only, no new changes. New work goes
+  to Disco, Squash and Null. Stone wasn't mentioned; treated like Ring/Braun until the owner says otherwise.
 - 2.6.2 (2026-10-21): BlueALSA started preferring the chosen codec for known headphones (btcaps_<mac>, bt_born_for,
   bt_codec_prepare_for); 2.6.1 was released at c615d54 (its build record's version was fixed on GitHub, 6a0c70e).
 - 2.6.1 (2026-10-21): auto-route link probe time-outs are unknown, three completed empty probes forget the route

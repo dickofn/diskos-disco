@@ -13,6 +13,12 @@ diskOS remains beta software; version numbers do not imply broad hardware or fea
   normal order. Tested by hand on a Disc; the automatic version not yet.
 - The Connected pop-up names the headphones and the codec actually running (also on automatic reconnects).
 - The Bluetooth screen updates when headphones connect or disconnect while it's open.
+- Bluetooth screen polish: one "Connected to <headphones> - <codec>" line, bigger rows, larger hint text, less space
+  at the top.
+- Clock field on Disco, Squash and Null a touch larger; new Clock and info page with Battery percentage and Weather
+  (weather off: the clock isn't a button); Null's clock fades with the weather when the title lifts.
+- Back-swipe arrow on the track pop-up; it closes on release, like Back everywhere else.
+- Ring and Braun: development frozen (fixes only).
 - Headphones are marked with their known-good codecs; switched off, the next connection is prepared to start on the
   right codec; a quick off/on is switched up again instead of staying on SBC.
 

@@ -1340,7 +1340,7 @@ static void dev_cb(lv_event_t *e){
 static void add_dev_row(const char *mac, const char *name, int connected, const char *codec){
     lv_obj_t *r = lv_button_create(g_list);
     lv_obj_remove_style_all(r);
-    lv_obj_set_size(r, BROW_W, 54);
+    lv_obj_set_size(r, BROW_W, 64);                       /* 2.6.2 polish: taller rows */
     lv_obj_add_flag(r, LV_OBJ_FLAG_USER_1);                 /* curves with the circle */
     lv_obj_set_style_radius(r, TH_R_ROW, 0);
     lv_obj_set_style_bg_color(r, connected ? TC(SURFACE_RAISED) : TC(SURFACE), 0);
@@ -1354,20 +1354,20 @@ static void add_dev_row(const char *mac, const char *name, int connected, const 
 
     lv_obj_t *ic = lv_label_create(r);                       /* headphones: accent when connected */
     lv_label_set_text(ic, LV_SYMBOL_AUDIO);
-    lv_obj_set_pos(ic, 14, 18);
+    lv_obj_set_pos(ic, 14, 22);
     lv_obj_set_style_text_font(ic, TF(UI_16), 0);
     lv_obj_set_style_text_color(ic, connected ? (th_null()?TC(TEXT_PRIMARY):ui_current_accent()) : TC(TEXT_SECONDARY), 0);
     lv_obj_t *t = lv_label_create(r);
     lv_label_set_text(t, name);
     lv_label_set_long_mode(t, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_obj_set_pos(t, 42, 6); lv_obj_set_size(t, BROW_W - 42 - (connected ? 40 : 16), 24);
-    lv_obj_set_style_text_font(t, th_simple()?TF(UI_20):th_null()?TF(UI_18):ui_font_cjk(18), 0);       /* BT device names are user data: Cyrillic/CJK-capable (issue #3) */
+    lv_obj_set_pos(t, 42, 7); lv_obj_set_size(t, BROW_W - 42 - (connected ? 40 : 16), 28);
+    lv_obj_set_style_text_font(t, th_simple()?TF(UI_22):th_null()?TF(UI_20):ui_font_cjk(20), 0);       /* BT device names are user data: Cyrillic/CJK-capable (issue #3) */
     lv_obj_set_style_text_color(t, TC(TEXT_PRIMARY), 0);
     lv_obj_t *sl = lv_label_create(r);
     char st[40]; snprintf(st, sizeof st, "Connected%s%s", (codec && codec[0]) ? " - " : "", (codec && codec[0]) ? codec : "");
     lv_label_set_text(sl, connected ? st : "Tap to connect");
-    lv_obj_set_pos(sl, 42, 31);
-    lv_obj_set_style_text_font(sl, TH_F_DETAIL, 0);
+    lv_obj_set_pos(sl, 42, 37);
+    lv_obj_set_style_text_font(sl, TF(UI_18), 0);           /* the hint line, a bit larger (was 16) */
     lv_obj_set_style_text_color(sl, connected ? (th_null()?TC(TEXT_PRIMARY):ui_current_accent()) : TC(TEXT_SECONDARY), 0);
     if(connected){ lv_obj_t *ch = lv_label_create(r); lv_label_set_text(ch, LV_SYMBOL_RIGHT);   /* opens its details */
                    lv_obj_align(ch, LV_ALIGN_RIGHT_MID, -16, 0); lv_obj_set_style_text_color(ch, TC(TEXT_DISABLED), 0); }
@@ -1489,8 +1489,9 @@ static void scan_render(void){
     else { lv_obj_update_layout(g_list); curvelist_update(&g_bcl); }
     {   const char *cn = NULL, *cc = NULL;
         for(int i = 0; i < n; i++) if(local[i].connected){ cn = local[i].name; cc = local[i].codec; break; }
-        char hs[40]; snprintf(hs, sizeof hs, "Connected%s%s", (cc && cc[0]) ? " - " : "", (cc && cc[0]) ? cc : "");
-        hdr_set(BT_ON, cn ? cn : "Bluetooth is on", cn ? hs : "Connect a speaker to play audio (beta)"); }
+        char hs[200];   /* one line, scrolling when too long: "Connected to FiiO EH11 - LDAC" (2.6.2 polish) */
+        if(cn) snprintf(hs, sizeof hs, "Connected to %s%s%s", cn, (cc && cc[0]) ? " - " : "", (cc && cc[0]) ? cc : "");
+        hdr_set(BT_ON, cn ? hs : "Bluetooth is on", cn ? "" : "Connect a speaker to play audio (beta)"); }
     /* NOTE: audio output routing to the BT sink is intentionally DISABLED.
      * bluez+bluealsa does SBC encoding in software, which is too heavy for this
      * MIPS CPU (laggy audio + watchdog reboots), and the 0666 output-mux command
@@ -1778,15 +1779,35 @@ void bt_create(lv_obj_t *root){
     lv_obj_add_flag(g_list, LV_OBJ_FLAG_SCROLL_MOMENTUM);
     curvelist_attach(&g_bcl, g_list, root, BROW_W);
     hdr_set(BT_OFF, "Bluetooth", "");
+    /* 2.6.2 polish: less empty space at the top, one legible "Connected to ..." line, a larger hint, a taller list.
+     * Shared layout (Disco, Ring, Stone) here; Squash, Null and Braun after their skins below. */
+    lv_obj_align(g_hring, LV_ALIGN_TOP_MID, 0, 20); lv_obj_align(g_hglyph, LV_ALIGN_TOP_MID, 0, 48);
+    lv_obj_align(g_sw, LV_ALIGN_TOP_MID, 106, 50); lv_obj_align(rb, LV_ALIGN_TOP_MID, -106, 45);
+    lv_obj_set_width(g_hname, 296); lv_obj_set_style_text_font(g_hname, ui_font_cjk(18), 0);   /* fits a typical name; longer ones scroll */
+    lv_obj_align(g_hname, LV_ALIGN_TOP_MID, 0, 110);
+    lv_obj_set_style_text_font(g_hsub, ui_font_cjk(16), 0); lv_obj_align(g_hsub, LV_ALIGN_TOP_MID, 0, 138);
+    lv_obj_set_pos(g_list, (360 - BROW_W) / 2, 162); lv_obj_set_size(g_list, BROW_W, 190);
     if(th_simple())simple_radio_skin(g_hring,g_hglyph,g_hname,g_hsub,g_sw,rb,g_list);
-    if(th_null())null_radio_skin(root,"BLUETOOTH",g_hring,g_hglyph,g_hname,g_hsub,g_sw,rb,g_list);
+    if(th_simple()){                                    /* Squash: the same, in its proportions */
+        lv_obj_align(g_hring, LV_ALIGN_TOP_MID, 0, 26); lv_obj_align(g_hglyph, LV_ALIGN_TOP_MID, 0, 38);
+        lv_obj_align(rb, LV_ALIGN_TOP_MID, -86, 44); lv_obj_align(g_sw, LV_ALIGN_TOP_MID, 92, 52);
+        lv_obj_set_size(g_hname, 308, 28); lv_obj_set_style_text_font(g_hname, TF(UI_20), 0); lv_obj_align(g_hname, LV_ALIGN_TOP_MID, 0, 116);
+        lv_obj_set_style_text_font(g_hsub, TF(UI_20), 0); lv_obj_align(g_hsub, LV_ALIGN_TOP_MID, 0, 146);
+        lv_obj_set_pos(g_list, 30, 170); lv_obj_set_size(g_list, 300, 176);
+        lv_label_set_long_mode(g_hname, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    }
+    if(th_null()){null_radio_skin(root,"BLUETOOTH",g_hring,g_hglyph,g_hname,g_hsub,g_sw,rb,g_list);
+        lv_obj_set_style_text_font(g_hsub, TF(UI_18), 0);              /* Null keeps its layout; the hint a bit larger */
+        lv_label_set_long_mode(g_hname, LV_LABEL_LONG_SCROLL_CIRCULAR); }
     if(th_braun()){
         lv_obj_add_flag(g_hring, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(g_hglyph, LV_OBJ_FLAG_HIDDEN);
         lv_obj_t *pd = br_disc(root, 180, 80, 44, BR_PANEL); (void)pd;
         g_hknob = br_knob(root, 180, 76, 30, LV_SYMBOL_BLUETOOTH, TF(UI_20));
         br_style_switch(g_sw);
         lv_obj_set_style_text_color(g_hname, TC(TEXT_PRIMARY), 0); lv_obj_set_style_text_font(g_hname, br_font(18, 1), 0);
-        lv_obj_set_style_text_color(g_hsub, TC(TEXT_SECONDARY), 0); lv_obj_set_style_text_font(g_hsub, br_font(12, 0), 0);
+        lv_obj_set_style_text_color(g_hsub, TC(TEXT_SECONDARY), 0); lv_obj_set_style_text_font(g_hsub, br_font(14, 0), 0);
+        lv_obj_set_width(g_hname, 276); lv_obj_align(g_hname, LV_ALIGN_TOP_MID, 0, 120); lv_obj_align(g_hsub, LV_ALIGN_TOP_MID, 0, 146);   /* Braun: knob stays */
+        lv_obj_set_pos(g_list, (360 - BROW_W) / 2, 168); lv_obj_set_size(g_list, BROW_W, 184);
         for(uint32_t k = 0; k < lv_obj_get_child_count(root); k++){      /* the rescan button: a flat disc */
             lv_obj_t *o = lv_obj_get_child(root, k);
             if(lv_obj_check_type(o, &lv_button_class) && lv_obj_get_width(o) == 34){
@@ -1854,4 +1875,4 @@ void bt_open(void){
 }
 
 /* Host preview fixture: not called by device code. */
-void bt_preview_null(void){lv_obj_clean(g_list);hdr_set(BT_ON,"FiiO EH11","CONNECTED / SBC");lv_obj_add_state(g_sw,LV_STATE_CHECKED);add_dev_row("00:11:22:33:44:55","FiiO EH11",1,"SBC");add_dev_row("00:11:22:33:44:66","Living room",0,"");add_dev_row("00:11:22:33:44:77","Studio headphones",0,"");curvelist_update(&g_bcl);}
+void bt_preview_null(void){lv_obj_clean(g_list);hdr_set(BT_ON,getenv("BT_PREVIEW_HDR")?getenv("BT_PREVIEW_HDR"):"Connected to FiiO EH11 - LDAC","");lv_obj_add_state(g_sw,LV_STATE_CHECKED);add_dev_row("00:11:22:33:44:55","FiiO EH11",1,"LDAC");add_dev_row("00:11:22:33:44:66","Living room",0,"");add_dev_row("00:11:22:33:44:77","Studio headphones",0,"");curvelist_update(&g_bcl);}

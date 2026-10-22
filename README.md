@@ -39,8 +39,13 @@
 
 ## New in 2.6.2
 
-**Bluetooth headphones connect straight on AAC or LDAC**, with no switch and no pause, once Disco knows them. 2.6.1
-fixed headphones dropping mid-song and the Disc powering off in Bluetooth DAC mode or while plugged in.
+**Bluetooth, polished.** Headphones connect straight on AAC or LDAC, with no switch and no pause, once Disco knows
+them, and are remembered with the codecs that really work on them. A clear pop-up says what connected and on which
+codec ("Connected: FiiO EH11 / LDAC"), and the Bluetooth screen has a cleaner look: one "Connected to ..." line,
+bigger rows and larger text, and it updates as soon as headphones come or go.
+
+Also new: a larger, clearer clock field on Disco, Squash and Null, with an optional battery percentage and an
+optional weather line (Settings › Display › Music screen › Music information › Clock and info).
 [See what’s new](docs/releases/v2.6.2.md).
 
 ## Big. Bold. Squash.
@@ -206,7 +211,9 @@ Building another theme? Start with the [theme authoring framework](themes.md): s
 
 ## Also included: Ring and Braun
 
-Two more complete themes, with the same features and settings, are in **Settings › Display › Theme › Theme**:
+Two more complete themes, with the same features and settings, are in **Settings › Display › Theme › Theme**.
+**Their development is frozen:** they keep working and get fixes that apply to every theme, but no new changes;
+new features land in Disco, Squash and Null.
 
 <table>
 <tr>

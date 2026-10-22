@@ -336,7 +336,11 @@ static void layout_music(void)
 }
 static void nav_paint(void)
 {
-    if(music_weather)lv_obj_set_style_opa(music_weather,nav_value>=400?0:255*(400-nav_value)/400,0);
+    {   /* the title lifts into the clock's space as the menu opens: the clock fades out with the weather (2.6.2) */
+        int o = nav_value >= 400 ? 0 : 255 * (400 - nav_value) / 400;
+        if(music_weather)lv_obj_set_style_opa(music_weather,o,0);
+        if(music_clock)lv_obj_set_style_opa(music_clock,o,0);
+    }
     if (!band)
         return;
     lv_obj_set_x(band, left() ? -360 + nav_value * 360 / 1000 : 360 - nav_value * 360 / 1000);
@@ -479,15 +483,17 @@ static void clock_event(lv_event_t *e)
         }
         null_options_changed();
     } else if (lv_event_get_code(e) == LV_EVENT_SHORT_CLICKED &&
-               !lv_obj_has_flag(clock_box, LV_OBJ_FLAG_HIDDEN))
-        weather_app_open();
+               !lv_obj_has_flag(clock_box, LV_OBJ_FLAG_HIDDEN) && simple_cfg_get_int("clock_weather", 1))
+        weather_app_open();                                   /* weather hidden: the clock isn't a button */
 }
 void null_home_clock(const char *t) {
     snprintf(music_clock_text,sizeof music_clock_text,"%s",t?t:"--:--");
     text_set(music_clock,music_clock_text);text_set(qdate,music_clock_text);
 }
+static int nst_batt = -1, nst_chg, nst_wifi, nst_bt;      /* the last status, for redrawing on a setting change */
 void null_home_status(int batt, int charging, int wifi, int bt)
 {
+    nst_batt = batt; nst_chg = charging; nst_wifi = wifi; nst_bt = bt;
     char b[64] = "";
     size_t n = 0;
     if (wifi)
@@ -501,8 +507,24 @@ void null_home_status(int batt, int charging, int wifi, int bt)
                      : batt >= 15 ? LV_SYMBOL_BATTERY_1
                                   : LV_SYMBOL_BATTERY_EMPTY;
     if (batt >= 0)
-        snprintf(b + n, sizeof b - n, "%s", bs);
+        n += (size_t)snprintf(b + n, sizeof b - n, "%s", bs);
+    if (batt >= 0 && n < sizeof b && simple_cfg_get_int("clock_batt_pct", 0))   /* Clock and info > Battery percentage */
+        snprintf(b + n, sizeof b - n, " %d%%", batt > 100 ? 100 : batt);
     text_set(music_status, b);
+}
+/* Clock and info changed: the percentage and the weather line (and with it the clock's tap) */
+void null_clockinfo_apply(void)
+{
+    if (!th_null() || !music_status)
+        return;
+    if (nst_batt >= 0 || nst_wifi || nst_bt)
+        null_home_status(nst_batt, nst_chg, nst_wifi, nst_bt);
+    if (music_weather) {
+        if (simple_cfg_get_int("clock_weather", 1))
+            lv_obj_remove_flag(music_weather, LV_OBJ_FLAG_HIDDEN);
+        else
+            lv_obj_add_flag(music_weather, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 void null_home_create(lv_obj_t *r)
 {
@@ -519,15 +541,15 @@ void null_home_create(lv_obj_t *r)
     lv_obj_add_event_cb(clock_hit, clock_event, LV_EVENT_SHORT_CLICKED, NULL);
     clock_box = box(r, 72, 10, 216, 94);
     lv_obj_set_style_bg_opa(clock_box, 0, 0);
-    music_status = text(clock_box, "", 0, 7, 216, TF(UI_14), TC(TEXT_SECONDARY));
+    music_status = text(clock_box, "", 0, 5, 216, TF(UI_16), TC(TEXT_SECONDARY));   /* 2.6.2: icons a touch larger */
     music_clock = text(clock_box, "--:--", 0, 34, 216, music_font(4), TC(TEXT_PRIMARY));
 
     lv_obj_set_style_text_align(music_status, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_align(music_clock, LV_TEXT_ALIGN_CENTER, 0);
-    music_weather=text(clock_box,"",0,70,216,TF(UI_14),TC(TEXT_SECONDARY));
+    music_weather=text(clock_box,"",0,70,216,TF(UI_16),TC(TEXT_SECONDARY));
     static lv_font_t weather_font;
     extern const lv_font_t font_weather16;
-    weather_font=*TF(UI_14);weather_font.fallback=&font_weather16;
+    weather_font=*TF(UI_16);weather_font.fallback=&font_weather16;   /* 2.6.2: a touch larger */
     lv_obj_set_style_text_font(music_weather,&weather_font,0);
     title = text(r, "GO TO LIBRARY", 36, 116, 288, TF(HEADER), TC(TEXT_PRIMARY));
     artist = text(r, "", 36, 157, 288, &pixel14, TC(TEXT_SECONDARY));
@@ -571,6 +593,7 @@ void null_home_create(lv_obj_t *r)
     lv_obj_add_flag(gesture_feedback,LV_OBJ_FLAG_HIDDEN);
     keep_tree(r);
     null_options_changed();
+    null_clockinfo_apply();
 }
 void null_home_update(const char *t, const char *a, int p)
 {

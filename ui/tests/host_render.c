@@ -955,6 +955,11 @@ int main(int argc, char **argv){
         if(getenv("FONTSZ"))cfg_set_int_deferred("font_size",atoi(getenv("FONTSZ")));
         if(getenv("DISCO_MNU"))cfg_set_str_deferred("disco_mnu",getenv("DISCO_MNU"));
         cfg_set_int_deferred("disco_nav_hint",getenv("NAV_HINT")?0:1);   /* the first-time hint only when asked for */
+        if(getenv("CFG_INT")){   /* "key=val,key=val": settings for a render (test tool) */
+            char buf[256]; snprintf(buf,sizeof buf,"%s",getenv("CFG_INT"));
+            for(char *tok=strtok(buf,","); tok; tok=strtok(NULL,",")){ char *eq=strchr(tok,'='); if(eq){*eq=0; simple_cfg_set_int(tok,atoi(eq+1));} }
+            { void dhome_clockinfo_apply(void); void null_clockinfo_apply(void); dhome_clockinfo_apply(); null_clockinfo_apply(); }
+        }
         if(getenv("TRACKNO"))cfg_set_int_deferred("disco_trackno",1);
         screen_set_anim(0);screens_init();ui_set_accent_config(getenv("ACCENT")?1:0,getenv("ACCENT")?(int)strtol(getenv("ACCENT"),NULL,16):0);ui_set_np_style(theme_preset()==THEME_PRESET_RING?3:1);
         track_state_t st={0};snprintf(st.path,sizeof st.path,"%s",argv[5]);
@@ -2115,12 +2120,14 @@ render:
     if(th_simple()&&getenv("SIMPLE_NAV")){simple_nav_open(1);int ms=getenv("SIMPLE_NAV_MS")?atoi(getenv("SIMPLE_NAV_MS")):350;for(int i=0;i<ms/10;i++){lv_tick_inc(10);lv_timer_handler();}}
     if(th_simple()&&getenv("SIMPLE_NAV_PHASE"))simple_test_nav_phase(atoi(getenv("SIMPLE_NAV_PHASE")));
     if(th_simple()&&getenv("SIMPLE_POPUP")){extern void disco_track_overlay_open(void);disco_track_overlay_open();}
+    if(getenv("POPUP")){extern void disco_track_overlay_open(void);disco_track_overlay_open();nav_wait(300);}   /* the track popup, any Disco-family theme */
     if(th_simple()&&getenv("SIMPLE_ARROW_MS")){simple_action_feedback();for(int i=0;i<atoi(getenv("SIMPLE_ARROW_MS"))/10;i++){lv_tick_inc(10);lv_timer_handler();}}
     if(th_simple()&&getenv("SIMPLE_ARROW_FRAME"))simple_test_feedback_frame(atoi(getenv("SIMPLE_ARROW_FRAME")));
     lv_refr_now(d);
     if(th_simple()&&getenv("SQUASH_VOLUME")){ui_show_volume(atoi(getenv("SQUASH_VOLUME")));nav_wait(180);lv_refr_now(d);}
     if(getenv("VOLUME_CONCEPT")){volume_concept(atoi(getenv("VOLUME_CONCEPT")));lv_refr_now(d);}
     if(getenv("TOAST")){ui_toast(getenv("TOAST"));nav_wait(400);lv_refr_now(d);}   /* a pop-up on any screen, for checking its fit */
+    if(getenv("BACK_HINT")){void ui_back_hint(int,int);ui_back_hint(180,atoi(getenv("BACK_HINT")));nav_wait(200);lv_refr_now(d);}   /* the back arrow, for checking it shows */
     FILE *f=fopen(argv[5],"wb"); if(!f) return 1;
     fprintf(f,"P6\n360 360\n255\n");
     for(size_t i=0;i<sizeof pixels;i+=3){
