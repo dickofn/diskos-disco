@@ -37,6 +37,8 @@ static void bt_remember_last(const char *mac){ (void)mac; }
 enum { SCR_BT = 7 }; static int cur_screen, kicks;
 static int screen_current(void){ return cur_screen; }
 static void scan_kick(void){ kicks++; }
+static int rearms, borns; void ui_bt_codec_upgrade_arm(const char *m, int fresh){ (void)m; if(fresh) rearms++; }
+static void bt_alsa_rearm_born(void){ borns++; }
 ''' + fn("static int run_cap_bounded(") + "\n" + fn("static int bt_mac_valid(") + "\n" + fn("static void bt_autoroute_poll_cb(") + r'''
 static void poll(int m, int n){ mode = m; for(int i = 0; i < n; i++){ bt_autoroute_poll_cb(NULL); now += 3000; } }
 int main(void){
@@ -56,6 +58,10 @@ int main(void){
     poll(1, 2); assert(kicks == 2);                                               /* back on: refreshed once */
     cur_screen = 0; poll(0, 1); poll(1, 1); assert(kicks == 2);                   /* screen closed: nothing */
     puts("PASS the Bluetooth screen refreshes once when headphones connect or disconnect while it's open");
+    /* the EH11 case: off and on again quickly (route kept) - the codec is checked again on the new link */
+    rearms = 0; poll(1, 2); poll(0, 2); poll(1, 1); assert(rearms == 1);
+    borns = 0; poll(0, 3); assert(borns == 1); poll(0, 3); assert(borns == 1);   /* really gone: prepared once */
+    puts("PASS a link that comes back re-checks its codec; a real disconnect prepares BlueALSA once");
     return 0;
 }
 '''

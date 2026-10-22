@@ -29,8 +29,8 @@ static void cfg_set_int(const char *k, int v){ for(int i = 0; i < nk; i++) if(!s
 static char last_cmd[512]; static int system_(const char *c){ snprintf(last_cmd, sizeof last_cmd, "%s", c); if(strstr(c, "killall bluealsa")) restarts++; return 0; }
 #define system system_
 ''' + fn("static unsigned bt_codec_need(") + "\n" + fn("int bt_codec_pick(") + "\n" + \
-    "static int g_born;\n" + fn("static void bt_caps_key(") + "\n" + fn("static int bt_caps_get(") + "\n" + fn("static void bt_caps_set(") + "\n" + \
-    fn("static int bt_born_for(") + "\n" + fn("static void bt_alsa_args(") + "\n" + fn("static void bt_codec_prepare_for(") + r'''
+    "static int g_born;\n" + fn("static void bt_mac_cfg_key(") + "\n" + fn("static void bt_caps_key(") + "\n" + fn("static int bt_caps_get(") + "\n" + fn("static void bt_caps_set(") + "\n" + \
+    fn("static int bt_bad_get(") + "\n" + fn("static void bt_mark_codec(") + "\n" + fn("static int bt_born_for(") + "\n" + fn("static void bt_alsa_args(") + "\n" + fn("static void bt_alsa_rearm_born(") + "\n" + fn("static void bt_codec_prepare_for(") + r'''
 static int has(const char *a, const char *s){ return strstr(a, s) != NULL; }
 int main(void){
     char a[256]; const char *hp = "AA:BB:CC:DD:EE:FF", *other = "11:22:33:44:55:66";
@@ -49,6 +49,15 @@ int main(void){
     bt_codec_prepare_for(other); assert(restarts == 1 && g_born == 0 && has(last_cmd, "--codec=sbc"));   /* others */
     bt_codec_prepare_for(other); assert(restarts == 1);                                     /* already normal */
     puts("PASS connecting to other or unknown headphones restarts BlueALSA with the normal order; the usual ones don't");
+    /* known-good marks (owner, 2.6.2): a codec that never confirmed isn't insisted on; confirming clears that */
+    bt_caps_set(hp, BTC_AAC | BTC_LDAC); codec = 4; assert(bt_born_for(hp) == 2);
+    bt_mark_codec(hp, BTC_LDAC, 0); assert(bt_born_for(hp) == 1);             /* LDAC failed: born on AAC instead */
+    bt_mark_codec(hp, BTC_LDAC, 1); assert(bt_born_for(hp) == 2);             /* confirmed again: LDAC */
+    puts("PASS known-good marks: a codec that failed to confirm isn't born on; a confirmation restores it");
+    /* the EH11 case: learned during a normal-order session, then switched off -> ready to be born on LDAC */
+    restarts = 0; g_born = 0; bt_alsa_rearm_born(); assert(restarts == 1 && g_born == 2 && has(last_cmd, "--codec=-sbc"));
+    bt_alsa_rearm_born(); assert(restarts == 1);                              /* already right: no restart */
+    puts("PASS after the headphones have really gone, BlueALSA is restarted so their next connection is born on LDAC");
     return 0;
 }
 '''

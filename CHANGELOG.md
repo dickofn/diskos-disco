@@ -12,6 +12,8 @@ diskOS remains beta software; version numbers do not imply broad hardware or fea
   it), so there's no switch and no pause; unknown headphones work as before and are learned; other headphones get the
   normal order. Tested by hand on a Disc; the automatic version not yet.
 - The Bluetooth screen updates when headphones connect or disconnect while it's open.
+- Headphones are marked with their known-good codecs; switched off, the next connection is prepared to start on the
+  right codec; a quick off/on is switched up again instead of staying on SBC.
 
 [2.6.2 release notes](docs/releases/v2.6.2.md)
 

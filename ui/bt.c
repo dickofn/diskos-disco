@@ -338,11 +338,12 @@ __attribute__((unused)) static int bt_radio_on_legacy(void){
  * normal settings (bt_codec_prepare_for). Each headphone's codec list is remembered from its first connection. */
 int bt_codec_pick(int choice, unsigned avail, int avail_known);   /* below */
 static int g_born;                                     /* 0 normal start, 1 born on AAC, 2 born on LDAC */
-static void bt_caps_key(const char *mac, char *k, int cap){
+static void bt_mac_cfg_key(const char *prefix, const char *mac, char *k, int cap){
     char m[20] = {0}; int j = 0;
     for(int i = 0; mac && mac[i] && j < 12; i++) if(mac[i] != ':') m[j++] = mac[i];
-    snprintf(k, cap, "btcaps_%s", m);
+    snprintf(k, cap, "%s%s", prefix, m);
 }
+static void bt_caps_key(const char *mac, char *k, int cap){ bt_mac_cfg_key("btcaps_", mac, k, cap); }   /* codecs offered */
 static int bt_caps_get(const char *mac){              /* remembered codec bits (BTC_*), -1 unknown */
     if(!mac || !mac[0]) return -1;
     char k[32]; bt_caps_key(mac, k, sizeof k); return cfg_get_int(k, -1);
@@ -351,10 +352,21 @@ static void bt_caps_set(const char *mac, unsigned avail){
     char k[32]; bt_caps_key(mac, k, sizeof k);
     if(cfg_get_int(k, -1) != (int)avail) cfg_set_int(k, (int)avail);
 }
+/* Known-good marks: a codec BlueALSA confirmed running on these headphones is good; one that never confirmed is bad
+ * (until it confirms again), and is not insisted on at the next start. */
+static int bt_bad_get(const char *mac){ char k[32]; bt_mac_cfg_key("btbad_", mac, k, sizeof k); return cfg_get_int(k, 0); }
+static void bt_mark_codec(const char *mac, unsigned bit, int good){
+    if(!mac || !mac[0] || !bit) return;
+    char k[32]; bt_mac_cfg_key("btbad_", mac, k, sizeof k);   /* codecs that failed to confirm */
+    int bad = cfg_get_int(k, 0), nb = good ? (bad & ~(int)bit) : (bad | (int)bit);
+    if(nb != bad) cfg_set_int(k, nb);
+    if(good){ int caps = bt_caps_get(mac); if(caps < 0 || !(caps & (int)bit)) bt_caps_set(mac, (unsigned)((caps < 0 ? 0 : caps) | (int)bit)); }
+}
 /* The codec BlueALSA should be born on for these headphones: 0 SBC (normal start), 1 AAC, 2 LDAC. */
 static int bt_born_for(const char *mac){
     if(fw_os_ver() != 257) return 0;                   /* the codec setting only applies on V2.57 */
     int caps = bt_caps_get(mac); if(caps < 0) return 0;
+    caps &= ~bt_bad_get(mac);                          /* never born on a codec that failed to confirm */
     int v = bt_codec_pick(cfg_get_int("bt_codec", 0), (unsigned)caps, 1);
     return v == 1 ? 1 : v >= 2 ? 2 : 0;
 }
@@ -371,6 +383,18 @@ static void bt_ensure_services(void){
     bt_alsa_args(a, sizeof a, g_born);
     snprintf(cmd, sizeof cmd, "pidof bluealsa >/dev/null 2>&1 || bluealsa %s >/tmp/bluealsa.log 2>&1 &", a);
     system(cmd);
+}
+/* The headphones have really gone (nothing connected): if BlueALSA isn't started the way the usual headphones should
+ * be born (just learned them, or a different codec chosen), restart it now - nothing is playing over Bluetooth, and
+ * their next connection is then born on the right codec instead of starting on SBC. */
+static void bt_alsa_rearm_born(void){
+    int want = bt_born_for(cfg_get_str("bt_last", ""));
+    if(want == g_born) return;
+    char a[256], cmd[400]; bt_alsa_args(a, sizeof a, want);
+    snprintf(cmd, sizeof cmd, "killall bluealsa 2>/dev/null; sleep 0.3; bluealsa %s >/tmp/bluealsa.log 2>&1 &", a);
+    system(cmd);
+    g_born = want;
+    fprintf(stderr, "bt codec: BlueALSA restarted for the next connection (%s first)\n", want == 1 ? "AAC" : want == 2 ? "LDAC" : "SBC"); fflush(stderr);
 }
 /* Before connecting to these headphones: if BlueALSA was born on a codec they aren't known to support, restart it
  * with the normal settings (SBC first), so they get audio; the usual switch path then takes over. */
@@ -518,17 +542,18 @@ static int bt_codec_frame_value(const char *mac, int v, char *out, int cap){
  * One step per call (UI timer tick); returns 1 when finished (sent, unavailable, gave up, or the route changed). */
 void ui_resume_guard_arm(int reason, const char *mac);
 int bt_codec_upgrade_step(void){
-    char mac[18], f[48]; int send = -1, done = 0; struct bt_probe_arg *spawn = NULL;
+    char mac[18], f[48]; int send = -1, done = 0, mark = 0; unsigned mark_bit = 0; struct bt_probe_arg *spawn = NULL;
     pthread_mutex_lock(&g_cq_mu);
     snprintf(mac, sizeof mac, "%s", g_cq.mac);
     if(!g_cq.armed || strcmp(ui_route_mac(), mac)) done = 1;                 /* cancelled or routed away: forget it */
     else if(g_cq.verifying && g_cq.state == 2){
         /* sent: wait for BlueALSA to report the new codec before calling it done (the playback hold waits on this) */
         const char *want = g_cq.want_v == 1 ? "AAC" : "LDAC";
-        if(!strcmp(g_cq.sel, want)){ done = 1; g_cq.applied = 1;
+        if(!strcmp(g_cq.sel, want)){ done = 1; g_cq.applied = 1; mark = 1;
             fprintf(stderr, "bt codec: %s confirmed\n", want); fflush(stderr); }
-        else if(++g_cq.verify_tries >= BT_VERIFY_TRIES){ done = 1; g_cq.applied = 1;
+        else if(++g_cq.verify_tries >= BT_VERIFY_TRIES){ done = 1; g_cq.applied = 1; mark = -1;
             fprintf(stderr, "bt codec: %s not confirmed (selected '%s'), going on\n", want, g_cq.sel); fflush(stderr); }
+        mark_bit = g_cq.want_v == 1 ? BTC_AAC : BTC_LDAC;
         g_cq.state = 0;
     }
     else if(g_cq.verifying){ /* probe still running */ }
@@ -552,6 +577,7 @@ int bt_codec_upgrade_step(void){
     if(done) g_cq.armed = 0;
     unsigned gen_now = g_cq.gen;
     pthread_mutex_unlock(&g_cq_mu);
+    if(mark) bt_mark_codec(mac, mark_bit, mark > 0);      /* known-good / bad for these headphones */
     if(send > 0 && !ui_codec_switch_gate(mac)){              /* a song is starting: switch once that settles */
         pthread_mutex_lock(&g_cq_mu); if(g_cq.gen == gen_now) g_cq.state = 0; pthread_mutex_unlock(&g_cq_mu);
         send = 0;
@@ -738,11 +764,13 @@ static void bt_autoroute_poll_cb(lv_timer_t *t){
      * known devices (no discovery window), only on a change. */
     static int was_found = -1;
     if(was_found != -1 && found != was_found && screen_current() == SCR_BT) scan_kick();
+    if(found && was_found == 0) ui_bt_codec_upgrade_arm(mac, 1);   /* the link came back: check its codec again */
     was_found = found;
     static int missing;
     if(!found){
         if(++missing == 3){
             g_bt_autorouted[0] = 0; ui_bt_codec_upgrade_cancel();
+            bt_alsa_rearm_born();                            /* really gone: be ready to be born on the right codec */
             if(ui_route_mac()[0]){ void ui_route_forget(const char *why); ui_route_forget("link gone"); }
         }
         return;
