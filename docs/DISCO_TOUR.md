@@ -738,6 +738,8 @@ Swipe from the middle to select, then **Download**. Choose **Missing only** to f
 existing songs, or **Download again** to safely replace matching Disc Shelf originals. The radio colour keeps the
 local-presence indication; selected tracks show a check, and selected local tracks a checked SD-card icon.
 
+Copies temporarily disable Wi-Fi power saving when needed and restore the prior mode afterward. Already-disabled power saving is left alone.
+
 Both letter pickers and the usual list-position indicator are available. Nothing syncs in the background when the
 app is closed. Your old server configuration is preserved; new settings can be entered with the firmware keyboard.
 See [setup and older-firmware instructions](DISC_SHELF_INSTALL.md). Built in from 2.7.0. The standalone archive is only for older firmware. SMB3 remains experimental pending independent NAS/device testing.

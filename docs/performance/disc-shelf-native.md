@@ -134,7 +134,7 @@ empty/refused playback handling. Playback acceptance/counts are mocked for these
 host UI tests; physical-player validation remains with the test binary. No
 background work or library-wide playlist construction is added.
 
-## Follow-up: scoped Wi-Fi power-save override
+## Included in final 2.7.0: scoped Wi-Fi power-save override
 
 Copy jobs now query `/usr/bin/wl -i wlan0 PM` once on the Shelf worker. A known
 mode 1/2 is temporarily changed to 0 and restored after the Navidrome/SMB job
@@ -156,4 +156,4 @@ restoration; no permanent power-saving policy is written.
 query/setter cleanup. Navidrome and encrypted SMB wire regressions also pass.
 Real-driver setting/restore acceptance is pending a device test. In the reported
 slow-transfer incident PM was already 0; this guard is not claimed to fix that
-incident, which cleared after reconnecting Wi-Fi. Existing v2.7.0 is not retagged.
+incident, which cleared after reconnecting Wi-Fi. This guard is included in the final 2.7.0 release bundle, replacing the earlier unpublished local tag. GitHub had no v2.7.0 tag when the replacement was prepared.

@@ -56,6 +56,8 @@ SMB3 traffic is encrypted and credentials stay inside the process. Navidrome use
 
 ## Battery, speed and storage
 
+During a copy, Disc Shelf temporarily disables Wi-Fi power saving if it was enabled, then restores its previous mode after success, cancellation or errors. If it was already disabled, it stays unchanged. Unsupported driver commands are skipped; restoration is best-effort if the driver becomes unavailable. Forced process termination cannot guarantee restoration. This adds no polling, reconnects or permanent preferences.
+
 There is no discovery, periodic sync or remote browsing while the app is closed. The worker waits when idle; transfer checks and cancellation remain active. A download intentionally prevents idle power-off until it finishes or you cancel.
 
 Navidrome now batches small SD writes into a temporary 128 KiB buffer. Host tests show about 75% fewer file-write calls, **not a proven on-device transfer-speed increase**. Your Wi-Fi, server and card still matter. The buffer is released after each request; final file sync and low-space reserve checks remain.

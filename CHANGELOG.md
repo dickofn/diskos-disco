@@ -21,6 +21,7 @@ diskOS remains beta software; version numbers do not imply broad hardware or fea
 - Disc Shelf’s own CD-in-jewel-case icon, wider rows, aligned headers, smaller list type and selected-name scrolling.
 - Squash Settings headings align with the back arrow; the arrow is slightly further inward.
 - Download status is limited to three lines with ellipsis, with a smaller percentage, smoothed speed and a larger MiB counter.
+- Disc Shelf temporarily disables Wi-Fi power saving during Navidrome/SMB3 copy jobs, restoring the previous mode after completion, cancellation or errors. An already-disabled mode is left alone; there is no background polling or persistent setting change.
 - Navidrome coalesces small pipe packets into 128 KiB SD writes. A localhost test made about 75% fewer file-write calls; this is not a measured on-device speed gain.
 - Navidrome authentication uses a random salted token. Tokens remain reusable credentials; HTTP and helper process arguments are not private.
 - Updated website, how-to, setup, tour, privacy and release documentation. Legacy standalone Disc Shelf remains a separate older-firmware download.

@@ -43,7 +43,7 @@
 
 **Hold. Shuffle. Listen.** Set your menu hold action to **Shuffle!** to start the whole song library, return to Music and see “Happy listening!”. SongSphere also gets a themed preview with an explicit Open button, so browsing past it keeps you in control.
 
-Downloads now show clearer progress and speed. Batched SD writes reduce small-write overhead; an actual transfer-speed gain depends on your card and network. Navidrome has been tried on the Disc; SMB3 remains experimental pending real NAS testing.
+Downloads now show clearer progress and speed. Copy jobs temporarily disable Wi-Fi power saving when needed and restore the previous mode afterward. Batched SD writes reduce small-write overhead; an actual transfer-speed gain depends on your card and network. Navidrome has been tried on the Disc; SMB3 remains experimental pending real NAS testing.
 
 [What’s new](docs/releases/v2.7.0.md) · [Set up Disc Shelf](docs/DISC_SHELF_INSTALL.md) · [Quick how-to](docs/HOWTO.md)
 

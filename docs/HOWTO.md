@@ -11,6 +11,8 @@ Choose **Server**, select **Navidrome** or **SMB3**, enter the connection detail
 
 Browse your collection or share, then **swipe from the middle of a row to select**. Pick tracks, albums, artists, files or folders as appropriate and press **Download**. **Missing only** keeps existing files; **Download again** replaces only matching copies recorded by Disc Shelf. Partial albums can be finished without replacing what is already there. Use Disco’s normal indexing after downloading new music.
 
+Wi-Fi power saving is temporarily disabled during copying when needed, then restored to its previous mode. Already-disabled power saving stays unchanged. No permanent preference or background check is added.
+
 The circles show local presence; a selected missing item has a check, and an already synced selected item has an SD-card marker. Both letter pickers work. Downloads show file progress, MiB and a rolling speed. Nothing syncs with the app closed.
 
 **SMB3 is experimental.** Remember password Off keeps it for the session only. On stores readable credentials in a private file. See the [full setup and privacy guide](DISC_SHELF_INSTALL.md).
