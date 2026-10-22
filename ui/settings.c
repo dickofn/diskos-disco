@@ -416,7 +416,8 @@ static void apply_disco_side_ok(int v){
     theme_reload_or_revert("disco_side");
 }
 static void side_apply_cb(lv_event_t *e){ (void)e; apply_disco_side_ok(0); }
-static const char *OPT_NAV_ACTION[] = { "Music screen", "Search", "Queue", "Up Next", "Shortcuts", "Quick Settings", "Volume", "Screen off", "Play/Pause", "Next track", "Nothing" };
+static const char *OPT_NAV_ACTION[] = { "Music screen", "Search", "Queue", "Up Next", "Shortcuts", "Quick Settings", "Volume", "Screen off", "Play/Pause", "Next track", "Nothing", "Shuffle!" };
+_Static_assert(sizeof OPT_NAV_ACTION/sizeof *OPT_NAV_ACTION==DISCO_NAV_COUNT,"one label per menu action");
 static const char *OPT_DHOLD[] = { "Immersive", "Favourite", "Nothing" };
 static const char *OPT_DCTRL[] = { "Buttons", "Auto-hide", "Gestures" };
 void dhome_controls_apply(void);

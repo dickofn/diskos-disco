@@ -944,7 +944,20 @@ static int current_list_context(int *lt, char *name, int cap){
 }
 /* Play the current list, setting the play-mode first (0=Sequential, 1=Shuffle).
  * Play-mode = 0102 (ground-truth captured 2026-06-25); ui_set_workmode applies it. */
+/* Shared by Library > Songs and the menu shortcut: the stock all-songs list,
+ * not whichever artist/album/favourites view was last opened. */
+static int play_all_songs(int mode){
+    int count=mdb_song_count();
+    if(count<=0){ui_toast("Your music library is empty");return 0;}
+    ui_set_workmode(mode);
+    int pos=mode==1 && count>1?1+rand()%count:1;
+    if(!ui_play_list(1,"",pos))return 0;
+    screen_show(SCR_NOWPLAYING);
+    return 1;
+}
+int library_shuffle_all(void){return play_all_songs(1);}
 static void play_list_mode(int mode){
+    if(g_view==VIEW_SONGS){play_all_songs(mode);return;}
     if(g_view==VIEW_GROUP && g_drill_kind!=1 && g_scope_lvl==2){     /* one album of an artist / genre: its own stock queue */
         simple_cfg_set_int("work_mode", mode); ui_set_workmode(mode);
         if(scope_play_album(g_scope_album, mode == 1 ? -2 : -1)) screen_show(SCR_NOWPLAYING);

@@ -49,7 +49,7 @@ edge of the screen (on the left in [left-handed mode](#left-handed-mode)).
 - **Tap the middle** to open the section at its top level.
 - **Hold** the open circle to go straight back to Music, and **double-tap** it to open Search. Both are yours to
   change under Display > Navigation > Gestures > Menu hold / Menu double tap (Music, Search, Queue, Up Next, Shortcuts, Quick Settings, Volume, Screen off,
-  Play/Pause, Next track or Nothing).
+  Play/Pause, Next track, Nothing or Shuffle!). **Shuffle!** starts the full song library in shuffle mode, returns to Music and briefly shows a themed “Happy listening!” popup.
 - **Close it** with a tap anywhere outside it, or on the small › at its right end.
 
 The sections are yours to choose under Display > Navigation > Menu items: Music, Library, Artists,

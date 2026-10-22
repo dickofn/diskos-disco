@@ -34,7 +34,8 @@ const char *onboarding_gesture_text(int id){
     if(id==HINT_QUICK)return th_null()?"Pull down from the top for QS. Swipe up beside the panel, tap outside, or tap its bottom arrow to close.":"Pull down from the top for QS; swipe up to close.";
     if(id==HINT_NAV)return th_null()?"Tap the side arrow for the menu. Drag text or the handle to browse; tap an item to open.":"Tap the side tab for the menu. Arrows browse; centre icon opens. Double-tap / hold shortcuts are configurable.";
     if(id==HINT_HANDLE){
-        static const char *names[]={"Music","Search","Queue","Up Next","Shortcuts","Quick Settings","Volume","Screen off","Play/Pause","Next track","Nothing"};
+        static const char *names[]={"Music","Search","Queue","Up Next","Shortcuts","Quick Settings","Volume","Screen off","Play/Pause","Next track","Nothing","Shuffle!"};
+        _Static_assert(sizeof names/sizeof *names==DISCO_NAV_COUNT,"one hint per menu action");
         static char tip[192];
         int tap=simple_cfg_get_int("null_nav_double",DISCO_NAV_SEARCH),hold=simple_cfg_get_int("null_nav_hold",DISCO_NAV_MUSIC);
         if(tap<0 || tap>=DISCO_NAV_COUNT)tap=DISCO_NAV_SEARCH;

@@ -33,6 +33,17 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+static int shuffle_test_active,shuffle_test_count=7,shuffle_test_calls,shuffle_test_ok=1,shuffle_test_pos;
+int __real_mdb_song_count(void);
+int __real_ui_play_list(int,const char*,int);
+int __wrap_mdb_song_count(void){return shuffle_test_active?shuffle_test_count:__real_mdb_song_count();}
+int __wrap_ui_play_list(int kind,const char*name,int pos){
+ if(!shuffle_test_active)return __real_ui_play_list(kind,name,pos);
+ assert(kind==1 && name && !*name && pos>=1 && pos<=shuffle_test_count);
+ shuffle_test_calls++;shuffle_test_pos=pos;
+ if(!shuffle_test_ok)ui_toast("Player busy - try again");
+ return shuffle_test_ok;
+}
 static int guard_db_opens;
 int __real_ssdb_open(void);
 int __wrap_ssdb_open(void){guard_db_opens++;return getenv("REVIEW_GUARD")?0:__real_ssdb_open();}
@@ -223,8 +234,8 @@ static void review_nav(void){
     lv_indev_t *in=lv_indev_create();lv_indev_set_type(in,LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(in,nav_read);lv_indev_set_long_press_time(in,400);
     int destinations[]={SCR_HOME,SCR_SEARCH,SCR_QUEUE,SCR_UPNEXT,SCR_APPS,SCR_QUICK,SCR_LIBRARY,SCR_LIBRARY,SCR_LIBRARY,SCR_LIBRARY,SCR_LIBRARY};   /* Volume, Screen off, Play/Pause, Next track and Nothing stay put */
-    _Static_assert(sizeof destinations/sizeof destinations[0]==DISCO_NAV_COUNT,"one destination per action");
-    for(int action=0;action<DISCO_NAV_COUNT;action++){
+    _Static_assert(sizeof destinations/sizeof destinations[0]==DISCO_NAV_SHUFFLE,"legacy menu destinations; Shuffle has its own playback fixture");
+    for(int action=0;action<DISCO_NAV_SHUFFLE;action++){
         cfg_set_int_deferred("disco_nav_double",action);cfg_set_int_deferred("disco_nav_hold",action);
         screen_show(SCR_LIBRARY);disco_nav_set_open(0);nav_wait(300);
         /* A hold on the CLOSED shard only opens it on release. */
@@ -775,6 +786,35 @@ int main(int argc, char **argv){
         screen_set_anim(0);screens_init();screen_show(SCR_HOME);
         void ui_show_volume(int); ui_show_volume(74);
         for(int i=0;i<30;i++){lv_tick_inc(10);lv_timer_handler();}
+        goto render;
+    }
+    if(!strcmp(argv[3],"shuffle-hold")){
+        _Static_assert(DISCO_NAV_NONE==10,"saved Nothing action must stay compatible");
+        screen_set_anim(0);screens_init();screen_home();shuffle_test_active=1;
+        simple_cfg_set_int_deferred("disco_nav_v",2);
+        simple_cfg_set_int_deferred(th_null()?"null_nav_hold":"disco_nav_hold",DISCO_NAV_SHUFFLE);
+        lv_indev_t *in=lv_indev_create();lv_indev_set_type(in,LV_INDEV_TYPE_POINTER);
+        lv_indev_set_read_cb(in,nav_read);lv_indev_set_long_press_time(in,400);lv_timer_set_period(lv_indev_get_read_timer(in),10);
+        if(th_null()){null_nav_set_open(1);nav_wait(250);nav_touch((lv_point_t){180,200},750);}
+        else if(th_simple()){simple_nav_open(1);nav_wait(250);nav_touch((lv_point_t){180,160},750);}
+        else {void disco_test_nav_points(lv_point_t*,lv_point_t*);lv_point_t icon,tab;disco_nav_set_open(1);nav_wait(250);disco_test_nav_points(&icon,&tab);nav_touch(icon,750);}
+        nav_wait(100);
+        assert(shuffle_test_calls==1 && shuffle_test_pos>=1 && shuffle_test_pos<=7);
+        assert(simple_cfg_get_int("work_mode",-1)==1 && screen_current()==SCR_HOME);
+        assert(find_visible_text(lv_layer_top(),"Happy listening!"));
+        if(th_simple())assert(!simple_nav_is_open());
+        else if(!th_null()){int disco_test_nav_open(void);assert(!disco_test_nav_open());}
+        /* Empty libraries and refused plays must not show a success popup. */
+        nav_wait(2500);shuffle_test_count=0;simple_cfg_set_int_deferred("work_mode",0);screen_show(SCR_SEARCH);
+        disco_nav_action_run(DISCO_NAV_SHUFFLE);
+        assert(shuffle_test_calls==1 && simple_cfg_get_int("work_mode",-1)==0 && screen_current()==SCR_SEARCH);
+        assert(!find_visible_text(lv_layer_top(),"Happy listening!"));
+        shuffle_test_count=7;shuffle_test_ok=0;disco_nav_action_run(DISCO_NAV_SHUFFLE);
+        assert(shuffle_test_calls==2 && screen_current()==SCR_SEARCH);
+        assert(!find_visible_text(lv_layer_top(),"Happy listening!"));
+        shuffle_test_ok=1;disco_nav_action_run(DISCO_NAV_SHUFFLE);nav_wait(100);
+        assert(shuffle_test_calls==3 && screen_current()==SCR_HOME && find_visible_text(lv_layer_top(),"Happy listening!"));
+        puts("PASS: real menu hold starts all-song shuffle once, closes menu, returns Music, success popup; empty/refused playback has no false success");
         goto render;
     }
     if(!strcmp(argv[3],"ssphere-guard")){

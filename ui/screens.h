@@ -44,7 +44,9 @@ void queue_create(lv_obj_t *root);
 /* stored in cfg disco_nav_double / disco_nav_hold; 1.4.1 added four before Nothing (older saves of 6 = Nothing are
  * moved to the new value once, see disco_nav_migrate) */
 enum { DISCO_NAV_MUSIC, DISCO_NAV_SEARCH, DISCO_NAV_QUEUE, DISCO_NAV_UPNEXT, DISCO_NAV_SHORTCUTS, DISCO_NAV_QUICK,
-       DISCO_NAV_VOLUME, DISCO_NAV_SCREENOFF, DISCO_NAV_PLAYPAUSE, DISCO_NAV_NEXT, DISCO_NAV_NONE, DISCO_NAV_COUNT };
+       DISCO_NAV_VOLUME, DISCO_NAV_SCREENOFF, DISCO_NAV_PLAYPAUSE, DISCO_NAV_NEXT, DISCO_NAV_NONE, DISCO_NAV_SHUFFLE, DISCO_NAV_COUNT };
+/* Append new actions: existing saved action numbers must not change. */
+int library_shuffle_all(void);
 void disco_nav_migrate(void);
 void disco_nav_action_run(int action);
 int disco_track_overlay_visible(void);

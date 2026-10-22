@@ -117,3 +117,20 @@ tagging remains immediate. The guard creates no sphere engine, DB connection,
 worker or animation timer. Native LVGL fixtures exercise all three themes,
 preview switching/cleanup, menu and app dispatch, and a wrapped ssdb_open that
 asserts zero opens before clicking and one attempt after clicking Open.
+
+## Menu Shuffle! action
+
+The common menu action list now includes Shuffle!, for Disco, Null and Squash.
+It is appended after the existing saved actions (Nothing remains 10). Both the
+menu shortcut and Library > Songs use the same all-song playback helper: reject
+an empty music library, set shuffle mode, choose a random valid list position,
+request the stock all-song list and navigate to Music on acceptance. Success
+uses the existing nonblocking themed popup with a shuffle icon, Happy listening!
+and its existing 2.4-second dismiss timer. Empty/refused requests show no false
+success. Direct album/artist/favourites shuffle paths are unchanged.
+
+Native LVGL pointer fixtures hold each theme's real menu target and verify a
+single all-song request, shuffle setting, Music destination, popup text and
+empty/refused playback handling. Playback acceptance/counts are mocked for these
+host UI tests; physical-player validation remains with the test binary. No
+background work or library-wide playlist construction is added.

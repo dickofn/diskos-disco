@@ -444,6 +444,9 @@ void disco_nav_action_run(int action){
         case DISCO_NAV_SCREENOFF:ui_request_sleep();break;                   /* as the old Screen off tile: dims, then off */
         case DISCO_NAV_PLAYPAUSE:ui_transport_command("0201000C0000");break;
         case DISCO_NAV_NEXT:ui_transport_command("0201000C0001");break;
+        case DISCO_NAV_SHUFFLE:
+            if(library_shuffle_all())ui_toast_icon(LV_SYMBOL_SHUFFLE,TC(ACCENT_PRIMARY),"Happy listening!");
+            break;
     }
 }
 static void nav_run(int action){
