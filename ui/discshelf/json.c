@@ -185,7 +185,8 @@ static void field(parser_t *p, item_t *r, const char *k, const char *v) {
   COPY("coverArt", cover);
   if (!strcmp(k, "track") || !strcmp(k, "discNumber") ||
       !strcmp(k, "songCount") || !strcmp(k, "albumCount") ||
-      !strcmp(k, "size")) {
+      !strcmp(k, "size") || !strcmp(k,"year")) {
+    if(!strcmp(k,"year") && !strcmp(v,"null"))return;
     char *end;
     errno = 0;
     long long number = strtoll(v, &end, 10);
@@ -194,7 +195,9 @@ static void field(parser_t *p, item_t *r, const char *k, const char *v) {
       p->error = 1;
       return;
     }
-    if (!strcmp(k, "track"))
+    if (!strcmp(k,"year"))
+      r->year=number<=9999?(int)number:0;
+    else if (!strcmp(k, "track"))
       r->track = (int)number;
     else if (!strcmp(k, "discNumber"))
       r->disc = (int)number;
@@ -242,7 +245,7 @@ static void object(parser_t *p, int kind) {
                    !strcmp(key, "suffix") || !strcmp(key, "coverArt") ||
                    !strcmp(key, "track") || !strcmp(key, "discNumber") ||
                    !strcmp(key, "size") || !strcmp(key, "songCount") ||
-                   !strcmp(key, "albumCount");
+                   !strcmp(key, "albumCount") || !strcmp(key,"year");
       if (!wanted && p->c == '"') {
         string(p, NULL, 0);
         v[0] = 0;
@@ -278,7 +281,7 @@ static void value(parser_t *p, const char *key, int array_kind) {
     return;
   }
   if (p->c == '{')
-    object(p, array_kind);
+    object(p, array_kind?array_kind:!strcmp(key,"album")?ALBUMS:0);
   else if (p->c == '[') {
     int kind = kind_for(key);
     next(p);

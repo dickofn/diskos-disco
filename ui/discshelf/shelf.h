@@ -9,7 +9,7 @@
 #define IDLEN 160
 enum { HOME, ARTISTS, ALBUMS, TRACKS, ARTIST_ALBUMS, SMB_DIR, SMB_FILE, SMB_BROWSER };
 typedef struct {
-  int kind, track, disc, count, local;
+  int kind, track, disc, count, local, year;
   int64_t size;
   char id[IDLEN], name[STR], artist[STR], album[STR], suffix[24], cover[IDLEN];
 } item_t;

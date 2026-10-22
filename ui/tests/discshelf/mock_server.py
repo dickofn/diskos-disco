@@ -2,7 +2,7 @@ import hashlib,http.server,json,urllib.parse,sqlite3,os,tempfile,subprocess,thre
 root=pathlib.Path(tempfile.mkdtemp(prefix='shelf-test-'))
 local=root/'library.db';con=sqlite3.connect(local);con.execute('CREATE TABLE SONG(TITLE,ARTIST,ALBUM,PATH,ALBUM_ARTIST)');existing=root/'existing.flac';existing.write_bytes(b'fLaC'+b'\0'*124);con.execute('INSERT INTO SONG VALUES(?,?,?,?,?)',('Existing','Guest Artist','Album One',str(existing),'Artist'));con.commit();con.close()
 requests=[]
-def album(n):return dict(id='album'+str(n),name='Album '+('One' if n==1 else 'Two'),artist='Artist',songCount=2,coverArt='cover'+str(n))
+def album(n):return dict(id='album'+str(n),name='Album '+('One' if n==1 else 'Two'),artist='Artist',songCount=2,coverArt='cover'+str(n),year=2000+n)
 def track(n,j):return dict(id=f't{n}{j}',title='Existing' if n==1 and j==0 else f'Track {n}-{j}',artist='Artist',album=album(n)['name'],suffix='flac',size=131072,track=j+1,discNumber=1)
 class Handler(http.server.BaseHTTPRequestHandler):
  def log_message(self,*args):pass
@@ -12,6 +12,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
   elif ep=='getAlbumList2':data['albumList2']={'album':[album(1),album(2)] if int(q.get('offset',['0'])[0])==0 else []}
   elif ep=='getArtist':data['artist']=dict(id='artist1',name='Artist',album=[album(1),album(2)])
   elif ep=='getAlbum':n=int(q['id'][0][-1]);data['album']=dict(album(n),song=[track(n,j) for j in range(2)])
+  elif ep=='getCoverArt':
+   b=b'\x89PNG\r\n\x1a\n'+b'\0'*16;self.send_response(200);self.send_header('Content-Length',str(len(b)));self.end_headers();self.wfile.write(b);return
   elif ep=='download':
    payload=b'fLaC'+b'\0'*(131072-4);self.send_response(200);self.send_header('Transfer-Encoding','chunked');self.end_headers()
    for i in range(0,len(payload),4096):b=payload[i:i+4096];self.wfile.write(f'{len(b):x}\r\n'.encode()+b+b'\r\n')
@@ -26,5 +28,8 @@ for run in range(2):
  print('download calls:',[r for r in requests if r[0]=='download'])
 files=list((root/'downloads').rglob('*.flac'));print('files',len(files));assert len(files)==3;assert len([r for r in requests if r[0]=='download'])==3
 assert not list((root/'downloads').rglob('*.part'))
+assert {p.parent.name for p in files}=={'2001 - Album One','2002 - Album Two'}
+assert all(p.name[:2].isdigit() and p.name[2:4]=='. ' for p in files)
+assert len(list((root/'downloads').rglob('cover.png')))==2
 print('PASS existing-library duplicate, artist expansion, chunked transfer, repeat launch, manifest duplicate, cleanup')
 server.shutdown()

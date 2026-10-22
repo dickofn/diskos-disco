@@ -18,6 +18,7 @@ diskOS remains beta software; version numbers do not imply broad hardware or fea
 - Shuffle! menu action in Disco, Null and Squash: use Library’s all-songs shuffle, return to Music and show the themed Happy listening! popup.
 
 ### Changed
+- Navidrome download layout: Artist/YYYY - Album/NN. Track name.ext. Album years are retained from existing responses; missing years use 0000. Real collisions get readable suffixes; existing manifest paths and SMB filenames remain unchanged.
 - Disc Shelf’s own CD-in-jewel-case icon, wider rows, aligned headers, smaller list type and selected-name scrolling.
 - Squash Settings headings align with the back arrow; the arrow is slightly further inward.
 - Download status is limited to three lines with ellipsis, with a smaller percentage, smoothed speed and a larger MiB counter.

@@ -738,6 +738,8 @@ Swipe from the middle to select, then **Download**. Choose **Missing only** to f
 existing songs, or **Download again** to safely replace matching Disc Shelf originals. The radio colour keeps the
 local-presence indication; selected tracks show a check, and selected local tracks a checked SD-card icon.
 
+New Navidrome downloads use `Artist/YYYY - Album/NN. Track name.ext`. Missing years use `0000`; real collisions receive a short suffix instead of overwriting another file. Existing downloaded files keep their paths and safe replacement records. SMB preserves the share’s original names.
+
 Copies temporarily disable Wi-Fi power saving when needed and restore the prior mode afterward. Already-disabled power saving is left alone.
 
 Both letter pickers and the usual list-position indicator are available. Nothing syncs in the background when the

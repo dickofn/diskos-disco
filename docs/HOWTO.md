@@ -17,6 +17,8 @@ The circles show local presence; a selected missing item has a check, and an alr
 
 **SMB3 is experimental.** Remember password Off keeps it for the session only. On stores readable credentials in a private file. See the [full setup and privacy guide](DISC_SHELF_INSTALL.md).
 
+New Navidrome downloads use `Artist/YYYY - Album/NN. Track name.ext`. Missing years use `0000`; real collisions receive a short suffix instead of overwriting another file. Existing downloaded files keep their paths and safe replacement records. SMB preserves the share’s original names.
+
 ## One hold, a fresh shuffle
 
 Open **Settings > Display > Navigation > Gestures > Menu hold**, choose **Shuffle!**, and apply if offered.

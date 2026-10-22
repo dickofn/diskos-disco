@@ -157,3 +157,22 @@ query/setter cleanup. Navidrome and encrypted SMB wire regressions also pass.
 Real-driver setting/restore acceptance is pending a device test. In the reported
 slow-transfer incident PM was already 0; this guard is not claimed to fix that
 incident, which cleared after reconnecting Wi-Fi. This guard is included in the final 2.7.0 release bundle, replacing the earlier unpublished local tag. GitHub had no v2.7.0 tag when the replacement was prepared.
+
+## Clean Navidrome filenames
+
+New copies use Artist/YYYY - Album/NN. Track name.ext. The parser retains year
+in the existing response/cache rows, and getAlbum metadata supplies a consistent
+album year before rows are published or copied (independent of JSON field order).
+Missing years use 0000; no extra network lookup or idle work is added. The same
+directory helper is used for cover art. Existing ownership paths are retained,
+including the previous hashed filenames, so no card migration or automatic
+renaming is performed. SMB naming is unchanged.
+
+Only actual collisions add a readable suffix, e.g. (Disc 2) or (2). An unowned
+same-size file or existing .part file is not adopted or overwritten merely
+because its clean filename matches. The local duplicate lookup distinguishes
+known copies of different server/track IDs, preserving repeated titles on
+different discs. Filename tests cover Unicode, missing years, 3-digit track
+numbers, collisions/temporary occupants, legacy owned redownloads and safe
+replacement; the HTTP fixture verifies inherited album year and cover placement.
+Navidrome and encrypted SMB3 host regressions pass.

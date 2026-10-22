@@ -118,6 +118,7 @@ static int stmt_bind_item(sqlite3_stmt *s, const item_t *r) {
   sqlite3_bind_int(s, 9, r->count);
   sqlite3_bind_int64(s, 10, r->size);
   sqlite3_bind_text(s, 11, r->cover, -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int(s,12,r->year);
   return sqlite3_step(s) == SQLITE_DONE;
 }
 static void row_item(sqlite3_stmt *s, item_t *r) {
@@ -137,6 +138,7 @@ static void row_item(sqlite3_stmt *s, item_t *r) {
   r->count = sqlite3_column_int(s, 8);
   r->size = sqlite3_column_int64(s, 9);
   GET(10, cover);
+  r->year=sqlite3_column_int(s,11);
 }
 typedef struct {
   sqlite3_stmt *insert;
@@ -152,7 +154,7 @@ static int emit_row(const item_t *r, void *ctx) {
 }
 static const char *columns =
     "(kind INT,id TEXT PRIMARY KEY,name TEXT,artist TEXT,album TEXT,suffix "
-    "TEXT,track INT,disc INT,count INT,size INTEGER,cover TEXT)";
+    "TEXT,track INT,disc INT,count INT,size INTEGER,cover TEXT,year INT)";
 static int reset_table(const char *name) {
   char sql[500];
   snprintf(sql, sizeof sql, "DROP TABLE IF EXISTS %s; CREATE TABLE %s%s", name,
@@ -180,7 +182,7 @@ static int fetch(const char *endpoint, const char *args, const char *table) {
   char sql[512];
   emit_context_t e = {0};
   snprintf(sql, sizeof sql,
-           "INSERT OR IGNORE INTO %s VALUES(?,?,?,?,?,?,?,?,?,?,?)", table);
+           "INSERT OR IGNORE INTO %s VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", table);
   int ok = execsql("BEGIN") && reset_table(table) &&
            sqlite3_prepare_v2(db, sql, -1, &e.insert, NULL) == SQLITE_OK &&
            ds_parse_response(response, emit_row, &e);
@@ -195,6 +197,9 @@ static int fetch(const char *endpoint, const char *args, const char *table) {
       snprintf(sql, sizeof sql, "CREATE INDEX %s_order ON %s(kind,disc,track)",
                table, table);
       ok = execsql(sql);
+      /* The album year takes precedence; songs may omit it or carry an
+       * original-release year. Metadata is parsed after all nested songs. */
+      if(ok){snprintf(sql,sizeof sql,"UPDATE %s SET year=(SELECT year FROM %s WHERE kind=%d AND year>0 LIMIT 1) WHERE kind=%d AND EXISTS(SELECT 1 FROM %s WHERE kind=%d AND year>0)",table,table,ALBUMS,TRACKS,table,ALBUMS);ok=execsql(sql);}
     }
     if (ok)
       ok = execsql("COMMIT");
@@ -334,12 +339,13 @@ static int duplicate(const item_t *r) {
   if (present)
     return 1;
   if (sqlite3_prepare_v2(
-          db, "SELECT path FROM local WHERE title=? AND album=? AND artist=?",
+          db, "SELECT l.path FROM local l WHERE title=? AND album=? AND artist=? AND NOT EXISTS(SELECT 1 FROM downloads d WHERE d.path=l.path AND (d.server<>? OR d.id<>?))",
           -1, &s, NULL) != SQLITE_OK)
     return -1;
   sqlite3_bind_text(s, 1, title, -1, SQLITE_TRANSIENT);
   sqlite3_bind_text(s, 2, album, -1, SQLITE_TRANSIENT);
   sqlite3_bind_text(s, 3, artist, -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(s,4,ds_server,-1,SQLITE_STATIC);sqlite3_bind_text(s,5,r->id,-1,SQLITE_STATIC);
   int rc;
   while ((rc = sqlite3_step(s)) == SQLITE_ROW)
     if (file_exists((const char *)sqlite3_column_text(s, 0), 0)) {
@@ -513,14 +519,6 @@ static int browse(request_t req) {
   }
   return ok;
 }
-static uint64_t hash(const char *s) {
-  uint64_t h = 1469598103934665603ULL;
-  while (*s) {
-    h ^= (unsigned char)*s++;
-    h *= 1099511628211ULL;
-  }
-  return h;
-}
 static void safe_name(const char *s, char *out, size_t cap) {
   size_t n = 0;
   const unsigned char *p = (const unsigned char *)s;
@@ -590,6 +588,28 @@ static int save_manifest(const item_t *r, const char *path) {
   }
   return ok;
 }
+static void track_directory(const item_t *r,char *dir,size_t cap){
+  char artist[100],album[100];safe_name(r->artist,artist,sizeof artist);safe_name(r->album,album,sizeof album);
+  int year=r->year>0 && r->year<=9999?r->year:0;
+  snprintf(dir,cap,"%s/%s/%04d - %s",ds_download_root,artist,year,album);
+}
+/* Clean first choice; keep any unrelated occupant and use a short suffix only
+ * for real collisions. Ownership is established solely by the manifest. */
+static int track_free_path(const item_t *r,const char *dir,const char *title,char *path,size_t cap){
+  for(int attempt=0;attempt<10000;attempt++){
+    int n;
+    if(!attempt)n=snprintf(path,cap,"%s/%02d. %s.%s",dir,r->track,title,r->suffix);
+    else if(attempt==1 && r->disc>1)n=snprintf(path,cap,"%s/%02d. %s (Disc %d).%s",dir,r->track,title,r->disc,r->suffix);
+    else n=snprintf(path,cap,"%s/%02d. %s (%d).%s",dir,r->track,title,attempt+1,r->suffix);
+    if(n<0 || (size_t)n>=cap)return 0;
+    struct stat st;if(lstat(path,&st)){
+      if(errno!=ENOENT)return 0;
+      char part[1630];snprintf(part,sizeof part,"%s.part",path);
+      if(lstat(part,&st)){if(errno==ENOENT)return 1;return 0;}
+    }
+  }
+  return 0;
+}
 static int download_track(item_t r, int *saved, int *skipped) {
   int dup = duplicate(&r);
   if (dup < 0) {
@@ -605,18 +625,10 @@ static int download_track(item_t r, int *saved, int *skipped) {
     ds_status_text("Unsupported file or unknown size; stopped.");
     return 0;
   }
-  char artist[100], album[100], title[120], dir[1300], path[1600], temp[1630],
-      encoded[500], args[600];
-  safe_name(r.artist, artist, sizeof artist);
-  safe_name(r.album, album, sizeof album);
-  safe_name(r.name, title, sizeof title);
-  snprintf(dir, sizeof dir, "%s/%s/%s", ds_download_root, artist, album);
-  if (!dirs(dir))
-    return 0;
-  snprintf(path, sizeof path, "%s/%02d-%03d %s-%016llx.%s", dir, r.disc,
-           r.track, title, (unsigned long long)(hash(r.id) ^ hash(ds_server)),
-           r.suffix);
-  snprintf(temp, sizeof temp, "%s.part", path);
+  char title[120], dir[1300], path[1600], temp[1630],encoded[500],args[600];
+  safe_name(r.name,title,sizeof title);track_directory(&r,dir,sizeof dir);
+  if(!dirs(dir))return 0;
+  path[0]=0;
   /* Replace only this server's exact ID, never a tag-only match in the user's library. */
   int owned=0; sqlite3_stmt *own=NULL;
   if(sqlite3_prepare_v2(db,"SELECT path FROM downloads WHERE server=? AND id=?",-1,&own,NULL)!=SQLITE_OK)return 0;
@@ -635,6 +647,7 @@ static int download_track(item_t r, int *saved, int *skipped) {
     }
   }
   sqlite3_finalize(own);if(orc!=SQLITE_ROW && orc!=SQLITE_DONE)return 0;
+  if(!owned && !track_free_path(&r,dir,title,path,sizeof path)){ds_status_text("Cannot choose a free filename; kept existing files.");return 0;}
   snprintf(temp,sizeof temp,"%s.part",path);
   if(dup && ds_shared.replace && !owned){(*skipped)++;return 1;}
   struct stat previous, st;int existed=!lstat(path,&previous);
@@ -701,6 +714,7 @@ static int next_item(const char *table, int kind, int64_t *cursor, item_t *r) {
     r->count = sqlite3_column_int(st, 9);
     r->size = sqlite3_column_int64(st, 10);
     FIELD(11, cover);
+    r->year=sqlite3_column_int(st,12);
   }
   sqlite3_finalize(st);
   return rc == SQLITE_ROW ? 1 : rc == SQLITE_DONE ? 0 : -1;
@@ -717,11 +731,8 @@ static void album_cover(const char *id) {
   sqlite3_finalize(st);
   if (!r.id[0])
     return;
-  char artist[100], album[100], dir[1300], path[1400], tmp[1400], encoded[500],
-      args[600];
-  safe_name(r.artist, artist, sizeof artist);
-  safe_name(r.album, album, sizeof album);
-  snprintf(dir, sizeof dir, "%s/%s/%s", ds_download_root, artist, album);
+  char dir[1300],path[1400],tmp[1400],encoded[500],args[600];
+  track_directory(&r,dir,sizeof dir);
   struct stat fs;
   if (stat(dir, &fs) || !S_ISDIR(fs.st_mode))
     return;

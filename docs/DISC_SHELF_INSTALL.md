@@ -33,6 +33,12 @@ SMB3 passed encrypted host wire tests, but **has not yet been validated against 
 
 The server must support SMB3 with encryption. There is no SMB1/SMB2 fallback. This is a folders-and-files browser, with no artist/album separation and no network playback. A folder selection includes its descendants and preserves their layout. Reported remote links are skipped. Oversized paths, very deep trees or listings beyond the safety limits fail instead of being silently truncated.
 
+## File and folder names
+
+New Navidrome downloads use `Artist/YYYY - Album/NN. Track name.ext`. Missing years use `0000`; real collisions receive a short suffix instead of overwriting another file. Existing downloaded files keep their paths and safe replacement records. SMB preserves the share’s original names.
+
+Example: `Björk/1997 - Homogenic/01. Hunter.flac`. Album metadata supplies the year; no extra request is needed. Filename-unsafe characters are replaced, Unicode is retained, and track numbers above 99 remain intact. Repeated titles on different discs remain separate.
+
 ## Select and download
 
 Swipe from the middle of a row to enter selection. A first-use hint explains this gesture; it follows your theme’s hint settings. Tap the selection circles for more items, then **Download**. This selection menu offers downloads rather than Library playback/queue actions.
