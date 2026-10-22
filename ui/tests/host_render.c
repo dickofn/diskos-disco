@@ -2,6 +2,7 @@
 /* Render actual LVGL screens without starting diskOS's hardware main loop. */
 #include "md5.h"
 #include "azjump.h"
+#include "discshelf.h"
 #include "roulette_backend.h"
 #include "lvgl/src/widgets/label/lv_label_private.h"
 #include "lvgl/src/misc/lv_timer_private.h"
@@ -927,6 +928,11 @@ int main(int argc, char **argv){
             puts("PASS: hidden screen styling deferred; current album colour applied on entry");
         }
         puts("PASS: battery 0..100/clamping/colour/no-glow; settings tokens; selector -> editor/back and EQ restore/failure");return 0;
+    }
+    if(!strncmp(argv[3],"shelf-",6)){
+        fixture=1;sd_io_init(media_local);assert(sd_io_resume());screen_set_anim(0);screens_init();
+        if(!strcmp(argv[3]+6,"wheel"))cfg_set_int("library_seeking",1);
+        screen_set_anim(0);discshelf_preview(argv[3]+6);nav_wait(50);goto render;
     }
     if(!strncmp(argv[3],"preview-",8)){
         fixture=1;sd_io_init(media_local);assert(sd_io_resume());

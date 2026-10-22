@@ -14,7 +14,7 @@ typedef struct {
   char id[IDLEN], name[STR], artist[STR], album[STR], suffix[24], cover[IDLEN];
 } item_t;
 typedef struct {
-  int view, offset, scroll_y;
+  int view, offset, scroll_y, jump;
   unsigned generation;
   char id[IDLEN], letter;
 } request_t;

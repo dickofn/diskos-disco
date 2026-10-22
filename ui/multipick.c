@@ -117,25 +117,21 @@ static void toggle(mp_host_t *h, lv_obj_t *r, int i){
     if(h->cnt == 0) mp_exit(h);                                             /* nothing ticked any more: back to normal */
 }
 /* ---- the row gestures -------------------------------------------------------------------------------------- */
-static uint32_t g_sw_t; static lv_point_t g_sw_p; static int g_sw_done;
+int mp_swipe_event(mp_gesture_t*g,lv_event_t*e){
+ lv_indev_t*in=lv_indev_active();if(!in)return 0;lv_event_code_t c=lv_event_get_code(e);
+ if(c==LV_EVENT_PRESSED){lv_indev_get_point(in,&g->start);g->done=0;g->since=lv_tick_get();return 0;}
+ if(c!=LV_EVENT_PRESSING||g->done||g->start.x<MP_EDGE||g->start.x>360-MP_EDGE)return 0;
+ lv_point_t p;lv_indev_get_point(in,&p);
+ if(abs(p.x-g->start.x)>=36&&abs(p.y-g->start.y)<22&&lv_tick_elaps(g->since)<900){g->done=1;lv_indev_wait_release(in);return 1;}return 0;
+}
+static mp_gesture_t g_sw;
 static void row_cb(lv_event_t *e){
     lv_event_code_t c = lv_event_get_code(e);
     lv_obj_t *r = lv_event_get_current_target(e);
     mp_host_t *h = host_of(r); if(!h) return;
     int i = (int)(intptr_t)lv_event_get_user_data(e);
-    lv_indev_t *in = lv_indev_active();
-    if(c == LV_EVENT_PRESSED){ if(in) lv_indev_get_point(in, &g_sw_p); g_sw_done = 0; g_sw_t = lv_tick_get(); return; }
-    if(c == LV_EVENT_PRESSING){
-        if(g_sw_done || !in || (h->can_pick && !h->can_pick())) return;
-        if(g_sw_p.x < MP_EDGE || g_sw_p.x > 360 - MP_EDGE) return;         /* edge strips: back swipe / navigation circle */
-        lv_point_t p; lv_indev_get_point(in, &p);
-        int dx = p.x - g_sw_p.x, dy = p.y - g_sw_p.y;
-        if(abs(dx) >= 36 && abs(dy) < 22 && lv_tick_elaps(g_sw_t) < 900){
-            g_sw_done = 1; lv_indev_wait_release(in);                         /* no tap, no hold, no scroll from this touch */
-            toggle(h, r, i);
-        }
-        return;
-    }
+    if(!h->can_pick || h->can_pick())if(mp_swipe_event(&g_sw,e)){toggle(h,r,i);return;}
+    if(c==LV_EVENT_PRESSED || c==LV_EVENT_PRESSING)return;
     if(!h->on) return;
     if(c == LV_EVENT_SHORT_CLICKED || c == LV_EVENT_CLICKED){ if(c == LV_EVENT_SHORT_CLICKED) toggle(h, r, i); lv_event_stop_processing(e); }
     else if(c == LV_EVENT_LONG_PRESSED){ lv_event_stop_processing(e); if(h->more) lv_obj_send_event(h->more, LV_EVENT_CLICKED, NULL); }

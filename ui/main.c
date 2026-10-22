@@ -53,6 +53,8 @@
 #include "command_spawn.h"
 #include "ui_instance.h"
 #include "power.h"
+#include "discshelf.h"
+int ds_fetch_entry(int argc,char **argv);
 #include "braun.h"
 
 static lv_indev_t *g_touch = NULL;
@@ -547,6 +549,7 @@ int ui_local_playback_allowed(void){
  * polls ui_sd_quiesce_drained() and either reboots or ends the quiesce, which reopens only a still-local card. */
 static _Atomic int g_sd_quiesce = 0;
 void ui_sd_quiesce_begin(void){
+    discshelf_stop();
     atomic_store(&g_sd_quiesce, 1);
     sd_io_hold();
     atomic_store(&g_sd_writable, 0);
@@ -1753,6 +1756,7 @@ void app_launch(const char *exec){
         boomshine_landing();
         return;
     }
+    if(!strcmp(exec, APP_BUILTIN_SHELF)){discshelf_open();return;}
     if(!strcmp(exec, APP_BUILTIN_SPHERE)){ sphere_ui_open(); return; }   /* built in: a screen of mq_ui */
     if(!strcmp(exec, APP_BUILTIN_STATS)){
         stats_landing();
@@ -3081,6 +3085,7 @@ void ui_home_hint(int x, int dy){
     }
 }
 int main(int argc, char **argv){
+    {int f=ds_fetch_entry(argc,argv);if(f>=0)return f;}
     /* fork: fiio_init starts us with stdin/stdout closed. Fill 0..2 with /dev/null first, so no descriptor opened later
      * can land there and be overwritten when a helper child dup2()s its stdio (that broke every SD-card update). */
     for(int fd = 0; fd < 3; fd++) if(fcntl(fd, F_GETFD) < 0){ int n = open("/dev/null", O_RDWR); if(n > 2) close(n); }
@@ -3448,6 +3453,7 @@ int main(int argc, char **argv){
         int playing = playstate_playing(&g_ps, st.have_track, st.position_ms, lv_tick_get(), 1600, 0);
         if(playing) g_play_sent_gen = ipc_generation();   /* playback observed this generation (any start, incl. hardware keys): its one-shot is moot */
         queue_tick(&st, playing);
+        discshelf_tick();
         play_defer_tick();           /* a play waiting for the codec switch */
         crashlog_tick();             /* freeze detector + memory watch (log only) */
         {   /* the player restarted underneath us: worth a line in the crash log (who went down first?) */
@@ -3865,7 +3871,7 @@ int main(int argc, char **argv){
              * other than Playback (USB DAC, Bluetooth DAC, BT streaming, AirPlay, USB storage) is the Disc in use
              * without a song of its own moving, and a Disc on external power (plugged in, or charging) is on purpose:
              * neither powers off. */
-            int busy = playing || ma_playing() || ui_get_source_mode() != 0 || usage_charging() || usage_plugged_in() == 1;
+            int busy = playing || ma_playing() || discshelf_busy() || ui_get_source_mode() != 0 || usage_charging() || usage_plugged_in() == 1;
             power_tick(last_activity, busy);
         }   /* Sendspin: AirPlay playback the player may not report */   /* AFTER all input is consumed (a pending touch must win the race): SD-safe shutdown, diskOS idle power-off, temperature notice */
         int in_saver = (screen_current()==SCR_SAVER);

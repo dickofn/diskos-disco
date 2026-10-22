@@ -25,6 +25,9 @@ typedef struct mp_host {
     lv_obj_t *bar, *more, *pop; char saved_title[64];
 } mp_host_t;
 
+typedef struct {lv_point_t start;uint32_t since;int done;} mp_gesture_t;
+/* Shared swipe recognizer; callers retain their own item IDs and actions. */
+int mp_swipe_event(mp_gesture_t *g,lv_event_t *e);
 void mp_attach(mp_host_t *h);                /* once, after root/list/title exist: builds the hidden action bar */
 void mp_row(mp_host_t *h, lv_obj_t *row, int index);   /* a row was built: picking gestures, and its tick if picking */
 int  mp_active(const mp_host_t *h);

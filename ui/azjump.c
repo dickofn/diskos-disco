@@ -17,7 +17,7 @@
 #include "null_theme.h"
 
 /* Letter wheel is allocated only while open. No per-song data or artwork. */
-static azjump_t *active_wheel,*library_picker;
+static azjump_t *active_wheel,*pickers[4];
 static const char wheel_letters[]="ABCDEFGHIJKLMNOPQRSTUVWXYZ#";
 static int wheel_mode(azjump_t *a){return a->library&&cfg_get_int("library_seeking",0)==1;}
 int azjump_active(void){return active_wheel!=NULL;}
@@ -32,10 +32,11 @@ static void wheel_close(azjump_t *a,int commit){
 int azjump_close_active(void){if(!active_wheel)return 0;wheel_close(active_wheel,0);return 1;}
 int azjump_owns_point(int x,int y){
     if(active_wheel)return 1;
-    azjump_t*a=library_picker;
-    if(!a||!wheel_mode(a)||!lv_obj_is_visible(a->btn))return 0;
-    lv_area_t box;lv_obj_get_coords(a->btn,&box);
-    return x>=box.x1-8&&x<=box.x2+8&&y>=box.y1-8&&y<=box.y2+8;
+    for(int i=0;i<4;i++){
+      azjump_t*a=pickers[i];if(!a||!wheel_mode(a)||!a->btn||!lv_obj_is_visible(a->btn))continue;
+      lv_area_t box;lv_obj_get_coords(a->btn,&box);
+      if(x>=box.x1-8&&x<=box.x2+8&&y>=box.y1-8&&y<=box.y2+8)return 1;
+    }return 0;
 }
 static void wheel_paint(azjump_t*a){
     char text[2]={wheel_letters[a->current],0};lv_label_set_text(a->selected,text);
@@ -153,8 +154,8 @@ static void btn_cb(lv_event_t *e){
 }
 
 void azjump_create(azjump_t *a, lv_obj_t *root, azjump_cb_t jump, const char *tag){
-    a->library=!strcmp(tag,"library");a->current=0;
-    if(a->library)library_picker=a;
+    a->library=!strcmp(tag,"library")||!strcmp(tag,"shelf");a->current=0;
+    if(a->library)for(int i=0;i<4;i++)if(!pickers[i]||pickers[i]==a){pickers[i]=a;break;}
     a->jump = jump;
     a->btn = lv_button_create(root);
     lv_obj_remove_style_all(a->btn);
@@ -223,4 +224,9 @@ void azjump_show(azjump_t *a, int on){
         }
     }
     else { wheel_close(a,0);lv_obj_add_flag(a->btn, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(a->grid, LV_OBJ_FLAG_HIDDEN); }
+}
+
+void azjump_destroy(azjump_t*a){
+ if(!a)return;wheel_close(a,0);for(int i=0;i<4;i++)if(pickers[i]==a)pickers[i]=NULL;
+ if(a->btn)lv_obj_delete(a->btn);if(a->grid)lv_obj_delete(a->grid);memset(a,0,sizeof *a);
 }

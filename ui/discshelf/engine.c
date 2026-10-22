@@ -375,10 +375,15 @@ static int local_album(const item_t *r) {
 static int publish(const char *table, request_t req) {
   char sql[700], filter[160] = "";
   if (req.view == TRACKS) snprintf(filter, sizeof filter, " WHERE kind=3");
-  else if (req.letter == '#')
-    snprintf(filter, sizeof filter, " WHERE upper(substr(name,1,1)) NOT BETWEEN 'A' AND 'Z'");
-  else if (req.letter >= 'A' && req.letter <= 'Z')
-    snprintf(filter, sizeof filter, " WHERE upper(substr(name,1,1))='%c'", req.letter);
+  if(req.jump && req.view!=TRACKS){
+    char condition[120];
+    if(req.letter=='#')snprintf(condition,sizeof condition,"upper(substr(name,1,1)) NOT BETWEEN 'A' AND 'Z'");
+    else if(req.letter>='A'&&req.letter<='Z')snprintf(condition,sizeof condition,"upper(substr(name,1,1))='%c'",req.letter);
+    else strcpy(condition,"0");
+    snprintf(sql,sizeof sql,"SELECT count(*) FROM %s WHERE name COLLATE NOCASE < (SELECT name FROM %s WHERE %s ORDER BY name COLLATE NOCASE,id LIMIT 1)",table,table,condition);
+    sqlite3_stmt*j=NULL;if(sqlite3_prepare_v2(db,sql,-1,&j,NULL)!=SQLITE_OK)return 0;
+    if(sqlite3_step(j)!=SQLITE_ROW){sqlite3_finalize(j);return 0;}req.offset=sqlite3_column_int(j,0);sqlite3_finalize(j);
+  }
   snprintf(sql,sizeof sql,"SELECT count(*) FROM %s%s",table,filter);
   sqlite3_stmt *counter=NULL;int total_count=-1;
   if(sqlite3_prepare_v2(db,sql,-1,&counter,NULL)==SQLITE_OK && sqlite3_step(counter)==SQLITE_ROW)
