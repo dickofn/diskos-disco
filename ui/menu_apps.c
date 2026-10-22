@@ -20,13 +20,14 @@ static int compare(const void *a,const void *b){
     return n?n:strcmp(x->id,y->id);
 }
 void menu_apps_scan(void){
-    menu_app_t *next=NULL;int n=0,capacity=0;
-    DIR *d=opendir(MENU_APPS_DIR);if(!d)return;
+    menu_app_t *next=calloc(16,sizeof *next);if(!next)return;int n=1,capacity=16;
+    md5_hex("disc-shelf",10,next[0].id);strcpy(next[0].name,"Disc Shelf");strcpy(next[0].exec,"builtin:disc-shelf");strcpy(next[0].tagline,"Your Navidrome, on the card.");strcpy(next[0].button,"Browse collection");
+    DIR *d=opendir(MENU_APPS_DIR);if(!d){free(apps);apps=next;count=n;return;}
     struct dirent *de;
     while((de=readdir(d))){
         if(de->d_name[0]=='.')continue;
         /* Built into the menu already. */
-        if(!strcmp(de->d_name,"album-roulette")||!strcmp(de->d_name,"boomshine")||!strcmp(de->d_name,"songsphere"))continue;   /* SongSphere: built in since 2.2.0 */
+        if(!strcmp(de->d_name,"album-roulette")||!strcmp(de->d_name,"boomshine")||!strcmp(de->d_name,"songsphere")||!strcmp(de->d_name,"disc-shelf"))continue;   /* SongSphere: built in since 2.2.0 */
         char dir[512],conf[544];struct stat st;
         int len=snprintf(dir,sizeof dir,MENU_APPS_DIR "/%s",de->d_name);
         if(len<0 || (size_t)len>=sizeof dir || stat(dir,&st)<0 || !S_ISDIR(st.st_mode))continue;

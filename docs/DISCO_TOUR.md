@@ -729,27 +729,18 @@ Album Roulette is **built in since 2.2.0**. If you installed the separate app be
 
 ## Disc Shelf
 
-**Your [Navidrome](https://www.navidrome.org/) server, one tap from the card.** Disc Shelf is a separate app that
-browses your server's artists and albums and downloads the **original files** (no transcoding) straight to the
-SD card, so they play offline like the rest of your library.
+**Your Navidrome, on the card.** The native Disc Shelf integration uses your theme and the normal Library layout.
+Open it in All apps, set your server under **Server**, and browse artists, albums and tracks.
 
-- **Browse:** Browse collection opens your artists. The A-Z picker jumps to a letter (numbers and symbols
-  included); an artist shows all of their albums in one list.
-- **Pick:** tap the round selectors next to artists or albums, then **Download**. A lime outline means some of
-  that music is already on the card (not necessarily all of it).
-- **Download:** files already on the card are skipped, nothing is overwritten, and you can cancel at any time.
-  The copy page shows progress and what it is doing.
-- **Afterwards:** rescan (Settings > System > Library > Rescan, or the Quick Settings button) so the new music shows up.
-- **Getting around:** Back goes up one level; Exit is on Disc Shelf's own start page. It follows your theme and
-  light or dark appearance.
+Swipe from the middle to select, then **Download**. Choose **Missing only** to finish partial albums without touching
+existing songs, or **Download again** to safely replace matching Disc Shelf originals. The radio colour keeps the
+local-presence indication; selected tracks show a check, and selected local tracks a checked SD-card icon.
 
-**Setting it up** takes one small text file, `shelf.conf`, with your server address, username, password and the
-card folder to download into. The [install guide](DISC_SHELF_INSTALL.md) walks through it. Add Disc Shelf to the
-navigation circle (Display > Navigation > Menu items), to Shortcuts, or open it from All apps. Like Album Roulette, it is
-installed separately: SD updates of the interface don't install or change it.
+Both letter pickers and the usual list-position indicator are available. Nothing syncs in the background when the
+app is closed. Your old server configuration is preserved; new settings can be entered with the firmware keyboard.
+See [setup and older-firmware instructions](DISC_SHELF_INSTALL.md). This development feature is based on 2.6.2;
+the public 2.6.2 binary still uses the standalone app.
 
-**Good to know:** your password is stored as plain text on the Disc (readable only by the system), so use a
-Navidrome account meant for this. Disc Shelf needs Wi-Fi and a server the Disc can reach.
 
 <table>
 <tr>

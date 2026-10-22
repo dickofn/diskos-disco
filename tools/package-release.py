@@ -48,9 +48,10 @@ with zipfile.ZipFile(complete,'w',zipfile.ZIP_DEFLATED) as z:
     z.write(root/'RELEASE_INSTALL.md','INSTALL.md');z.write(root/f'docs/releases/v{version}.md','RELEASE-NOTES.md')
     for name in ['UPDATING.md','WINDOWS.md','MACOS.md','DISC_SHELF_INSTALL.md']:z.write(root/'docs'/name,'docs/'+name)
     for name in ['LICENSE','NOTICE.md']:z.write(root/name,name)
-    for f in entries:z.write(f,f.relative_to(root))
+    # Disc Shelf is native now; its standalone archive remains available for older builds.
+    # Do not duplicate the executable in the complete firmware ZIP.
     for name,appver,archive,mode in apps:
-        z.write(out/archive,archive);source=f'{name}-{appver}-source.tar.gz';z.write(out/source,'corresponding-source/'+source)
+        source=f'{name}-{appver}-source.tar.gz';z.write(out/source,'corresponding-source/'+source)
 outputs.append(complete)
 for name,alg in [('SHA256SUMS','sha256'),('MD5SUMS','md5')]:
     (out/name).write_text(''.join(f'{hashlib.new(alg,f.read_bytes()).hexdigest()}  {f.name}\n' for f in outputs))

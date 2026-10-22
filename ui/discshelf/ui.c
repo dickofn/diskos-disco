@@ -14,6 +14,7 @@
 #include "screens.h"
 #include "shelf.h"
 #include "landing.h"
+#include "setup.h"
 #include <math.h>
 #include <assert.h>
 #include <signal.h>
@@ -37,7 +38,8 @@ static lv_obj_t *host_root, *choice;
 static curvelist_t list_curve;
 static int closing, preview_mode, hint_requested;
 static uint32_t last_tick;
-static int title_width;
+static int title_width, restart_after_close;
+static void settings_cb(lv_event_t *e);
 static mp_gesture_t swipe;
 static void update_title(void);
 static void positions(void);
@@ -333,7 +335,7 @@ static void curve_rows(void){
  curvelist_update(&list_curve);
  for(int i=0;i<PAGE;i++){
   lv_obj_t *r=row_pool[i];if(!r||lv_obj_has_flag(r,LV_OBJ_FLAG_HIDDEN))continue;
-  int w=lv_obj_get_width(r);lv_obj_set_width(lv_obj_get_child(r,0),w-62);
+  int w=lv_obj_get_width(r);lv_obj_set_width(lv_obj_get_child(r,0),w-100);
  }
  positions();
 }
@@ -422,7 +424,7 @@ static void row_create(int i){
  lv_obj_set_style_border_side(row,LV_BORDER_SIDE_BOTTOM,0);lv_obj_set_style_border_width(row,1,0);lv_obj_set_style_border_color(row,TC(BORDER),0);
  lv_obj_set_style_bg_color(row,TC(LIST_PRESSED),LV_STATE_PRESSED);lv_obj_set_style_bg_opa(row,255,LV_STATE_PRESSED);
  lv_obj_add_flag(row,LV_OBJ_FLAG_CLICKABLE);lv_obj_remove_flag(row,LV_OBJ_FLAG_SCROLLABLE);
- lv_obj_t *name=label(row,"",12,10,222,(th_null()?TF(USER_20):ui_font_cjk(18+2*theme_font_size())));lv_obj_set_height(name,32);
+ lv_obj_t *name=label(row,"",44,10,222,(th_null()?TF(USER_20):ui_font_cjk(18+2*theme_font_size())));lv_obj_set_height(name,32);
  lv_obj_t *unused=label(row,"",0,0,1,TF(UI_14));lv_obj_add_flag(unused,LV_OBJ_FLAG_HIDDEN);
  lv_obj_t *mark=lv_obj_create(row);lv_obj_remove_style_all(mark);lv_obj_set_size(mark,44,ROW_STEP-4);lv_obj_align(mark,LV_ALIGN_RIGHT_MID,0,0);
  lv_obj_remove_flag(mark,LV_OBJ_FLAG_SCROLLABLE|LV_OBJ_FLAG_EVENT_BUBBLE);lv_obj_add_flag(mark,LV_OBJ_FLAG_CLICKABLE);
@@ -517,6 +519,8 @@ static void build(void) {
   heading=ui_header_cb(root,"Disc Shelf",back_cb);title_width=lv_obj_get_style_width(heading,0);
   backbtn=lv_obj_get_child(root,lv_obj_get_index(heading)-1);
   exitbtn=shelf_home_exit();
+  lv_obj_set_pos(exitbtn,55,286);lv_obj_set_width(exitbtn,118);
+  button(landing,"Server",187,286,118,44,settings_cb,NULL);
   content = lv_obj_create(root);
   lv_obj_remove_style_all(content);
   lv_obj_set_pos(content,22,70);
@@ -545,6 +549,7 @@ static void build(void) {
 
 void discshelf_create(lv_obj_t *r){host_root=r;}
 void discshelf_open(void){
+ preview_mode=0;
  if(rows||ds_context){ui_toast("Disc Shelf is still closing");return;}
  rows=calloc(PAGE,sizeof *rows);if(!rows){ui_toast("Not enough memory");return;}
  hint_requested=0;view=HOME;level=0;nrows=nselected=total_rows=offset=selecting=quit=fatal=reporting=copying=closing=modal_saved=0;revision=-1;busy=1;current=(request_t){0};row_pool[0]=NULL;choice=NULL;last_tick=0;
@@ -553,6 +558,7 @@ void discshelf_open(void){
 }
 int discshelf_back_consumed(void){
  if(!rows)return 0;
+ if(ds_setup_close())return 1;
  if(choice){close_choice();return 1;}
  if(az_open()){az_close();return 1;}
  if(view==HOME)return 0;
@@ -567,7 +573,7 @@ void discshelf_tick(void){
  if(!preview_mode && (!sd_io_allowed() || (screen_current()!=SCR_SHELF && screen_current()!=SCR_SAVER && screen_current()!=SCR_QUICK)))discshelf_stop();
  if(closing){
   if(!ds_backend_collect())return;
-  close_choice();azjump_destroy(&alphabet);lv_obj_clean(host_root);memset(&list_curve,0,sizeof list_curve);free(rows);rows=NULL;root=NULL;closing=0;return;
+  ds_setup_close();close_choice();azjump_destroy(&alphabet);lv_obj_clean(host_root);memset(&list_curve,0,sizeof list_curve);free(rows);rows=NULL;root=NULL;closing=0;if(restart_after_close&&screen_current()==SCR_SHELF){restart_after_close=0;discshelf_open();}else restart_after_close=0;return;
  }
  if(lv_tick_elaps(last_tick)<200)return;last_tick=lv_tick_get();
  if(!ui_display_is_off() && screen_current()==SCR_SHELF)tick(NULL);
@@ -597,6 +603,20 @@ void discshelf_preview(const char *scene){
   toggle(&rows[0]);toggle(&rows[1]);toggle(&rows[2]);refresh_selection();
   if(!strcmp(scene,"dialog"))download_cb(NULL);
  }
+ if(!strcmp(scene,"setup"))ds_setup_open(NULL);
  if(!strcmp(scene,"grid")){azjump_show(&alphabet,1);lv_obj_send_event(alphabet.btn,LV_EVENT_SHORT_CLICKED,NULL);}
  if(!strcmp(scene,"wheel")){azjump_show(&alphabet,1);lv_obj_send_event(alphabet.btn,LV_EVENT_LONG_PRESSED,NULL);}
+}
+
+static void settings_saved(void){restart_after_close=1;discshelf_stop();}
+static void settings_cb(lv_event_t*e){(void)e;if(busy){ui_toast("Wait for loading, or cancel first");return;}ds_setup_open(settings_saved);}
+
+int discshelf_test_selected(void){return nselected;}
+lv_obj_t *discshelf_test_list(void){return content;}
+void discshelf_test_reset(void){
+ /* Preview-only cleanup; real lifetimes are owned by the backend completion handshake. */
+ if(!preview_mode)return;ds_setup_close();close_choice();azjump_destroy(&alphabet);
+ lv_obj_clean(host_root);memset(&list_curve,0,sizeof list_curve);free(rows);rows=NULL;
+ pthread_cond_destroy(&ds_shared.wake);pthread_mutex_destroy(&ds_shared.mu);free(ds_context);ds_context=NULL;
+ root=NULL;preview_mode=0;
 }

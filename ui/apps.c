@@ -56,11 +56,12 @@ static void scan_apps(void){
         md5_hex("builtin:stats", 13, a->id);
         snprintf(a->name, sizeof a->name, "Listening Stats"); snprintf(a->exec, sizeof a->exec, "%s", APP_BUILTIN_STATS);
     }
+    {app_t*a=&g_apps[g_napps++];md5_hex("disc-shelf",10,a->id);snprintf(a->name,sizeof a->name,"Disc Shelf");snprintf(a->exec,sizeof a->exec,"%s",APP_BUILTIN_SHELF);}
     DIR *d = opendir(APPS_DIR);
     if(!d) return;
     struct dirent *de;
     while((de = readdir(d)) && g_napps < MAX_APPS){
-        if(de->d_name[0] == '.' || !strcmp(de->d_name, "boomshine") || !strcmp(de->d_name, "songsphere") || !strcmp(de->d_name, "album-roulette")) continue;   /* built in now */   /* an old separate install: the built-in one wins */
+        if(de->d_name[0] == '.' || !strcmp(de->d_name, "boomshine") || !strcmp(de->d_name, "songsphere") || !strcmp(de->d_name, "album-roulette") || !strcmp(de->d_name,"disc-shelf")) continue;   /* built in now */   /* an old separate install: the built-in one wins */
         app_t *a = &g_apps[g_napps];
         /* Stable identity is the installation directory, never the display name.
          * A compact digest also fits the 47-byte configuration value limit. */

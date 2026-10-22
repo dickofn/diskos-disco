@@ -16,7 +16,7 @@ static lv_obj_t *pill(lv_obj_t*p,const char*s,int x,int y,int w,int h,const lv_f
 }
 static void shelf(lv_obj_t*p){
  /* Static primitives only: a cropped tower with canvas gradients fading its edges. */
- lv_color_t ghost=lv_color_mix(TC(ACCENT_PRIMARY),TC(TEXT_SECONDARY),100);
+ lv_color_t ghost=TC(TEXT_SECONDARY);
  lv_obj_t *frame=box(p,252,-12,128,350,TC(SURFACE),12,16);
  lv_obj_set_style_border_width(frame,2,0);lv_obj_set_style_border_color(frame,ghost,0);lv_obj_set_style_border_opa(frame,85,0);
  for(int i=0;i<10;i++){

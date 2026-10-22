@@ -17,7 +17,7 @@ static void *run(void *unused){
     if(!lease || !shelf_init(config_path,error,sizeof error)){
         ds_status_text("%s",lease?error:"SD card is busy or unavailable");
         pthread_mutex_lock(&ds_shared.mu);ds_shared.fatal=1;ds_shared.busy=0;ds_shared.revision++;pthread_mutex_unlock(&ds_shared.mu);
-        shelf_close();
+        if(lease)shelf_close();
     }else shelf_worker(NULL);
     if(lease)sd_io_end();
     /* Last access to context: UI may reclaim it after observing this release. */

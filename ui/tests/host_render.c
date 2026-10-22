@@ -932,7 +932,22 @@ int main(int argc, char **argv){
     if(!strncmp(argv[3],"shelf-",6)){
         fixture=1;sd_io_init(media_local);assert(sd_io_resume());screen_set_anim(0);screens_init();
         if(!strcmp(argv[3]+6,"wheel"))cfg_set_int("library_seeking",1);
-        screen_set_anim(0);discshelf_preview(argv[3]+6);nav_wait(50);goto render;
+        screen_set_anim(0);discshelf_preview(argv[3]+6);nav_wait(50);
+        if(getenv("REVIEW_SHELF")){
+          int discshelf_test_selected(void);lv_obj_t*discshelf_test_list(void);void discshelf_test_reset(void);
+          assert(screen_current()==SCR_SHELF && !discshelf_test_selected());
+          lv_indev_t*in=lv_indev_create();lv_indev_set_type(in,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(in,nav_read);lv_timer_set_period(lv_indev_get_read_timer(in),10);
+          lv_obj_t*list=discshelf_test_list();lv_obj_t*row=lv_obj_get_child(list,0);lv_area_t a;lv_obj_get_coords(row,&a);int y=(a.y1+a.y2)/2;
+          nav_pointer=(lv_indev_data_t){.point={150,y},.state=LV_INDEV_STATE_PRESSED};nav_wait(30);
+          for(int x=150;x<=205;x+=5){nav_pointer.point.x=x;nav_wait(10);}nav_pointer.state=LV_INDEV_STATE_RELEASED;nav_wait(50);
+          assert(discshelf_test_selected()==1);assert(find_visible_text(screen_get_root(SCR_SHELF),"Download (1)"));
+          assert(!find_visible_text(screen_get_root(SCR_SHELF),"Play")&&!find_visible_text(screen_get_root(SCR_SHELF),"Queue"));
+          assert(discshelf_back_consumed() && !discshelf_test_selected());
+          for(int c=0;c<8;c++){discshelf_test_reset();discshelf_preview("artists");nav_wait(10);}
+          assert(!discshelf_test_selected());discshelf_test_reset();lv_indev_delete(in);
+          puts("PASS native Disc Shelf: real swipe selection, Download-only actions, Back cancels, repeated preview open/close");return 0;
+        }
+        goto render;
     }
     if(!strncmp(argv[3],"preview-",8)){
         fixture=1;sd_io_init(media_local);assert(sd_io_resume());

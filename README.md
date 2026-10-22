@@ -163,8 +163,8 @@ All the details: [2.2.1 fixes](docs/releases/v2.2.1.md) · [2.2 release notes](d
 - **Album Roulette.** Too much music, nothing to play? Spin your collection: covers fly past, slow down and
   land on an album. Tap **Play!** to listen, hold the cover to spin again. Built in:
   [how it works](docs/DISCO_TOUR.md#album-roulette).
-- **Disc Shelf.** Browse your Navidrome server's artists and download original files to the card. Also a separate
-  app: [install it](docs/DISC_SHELF_INSTALL.md), [what it does](docs/DISCO_TOUR.md#disc-shelf).
+- **Disc Shelf.** Built-in Navidrome browsing and original-file downloads. Swipe to select; download missing tracks
+  or explicitly replace Disc Shelf downloads. [Set it up](docs/DISC_SHELF_INSTALL.md), [take the tour](docs/DISCO_TOUR.md#disc-shelf).
 - **Your apps in the menu.** Any installed app can sit in the navigation circle, with its own landing page.
 - **Music is home.** Big title and artist (centred or from the left), the play mode one tap away, transport on an
   arc. Progress as a rainbow **line** under the title or an **arc** around the rim. Drag either to seek.

@@ -9,6 +9,7 @@
  * the first five apps are shown. "Choose apps" (the pill under the list) opens the picker: tap to add or remove,
  * the number says the order. */
 #include "screens.h"
+#include "discshelf.h"
 #include "theme.h"
 #include "config.h"
 #include "curvelist.h"
@@ -210,6 +211,7 @@ static void open_cb(lv_event_t *e){
     int i = (int)(intptr_t)lv_event_get_user_data(e);
     if(i < 0 || i >= g_nall) return;
     const shelf_app_t *a = &g_all[i];
+    if(!strcmp(a->exec, APP_BUILTIN_SHELF)){discshelf_open();return;}
     if(!strcmp(a->exec, APP_BUILTIN_SPHERE)){ sphere_ui_open(); return; }   /* its first page is its landing page */
     if(!strcmp(a->exec, APP_BUILTIN_ROULETTE)){ screen_show(SCR_ROULETTE); return; }   /* its own vinyl landing page */
     applanding_icon(a->icon);

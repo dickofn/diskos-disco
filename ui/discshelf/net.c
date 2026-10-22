@@ -249,7 +249,7 @@ int ds_config_read(const char *path, int test, char *err, size_t cap) {
   ds_server[0]=ds_username[0]=ds_password[0]=ds_download_root[0]=0;
   FILE *f = fopen(path, "r");
   if (!f) {
-    snprintf(err, cap, "Missing shelf.conf.\nSee installation guide.");
+    snprintf(err, cap, "Open Server to set up Navidrome.");
     return 0;
   }
   char line[2048];
@@ -290,7 +290,7 @@ int ds_config_read(const char *path, int test, char *err, size_t cap) {
     ds_server[--n] = 0;
   if ((strncmp(ds_server, "http://", 7) && strncmp(ds_server, "https://", 8)) ||
       strpbrk(ds_server, " \t\r\n?#") || !ds_username[0] || !ds_password[0]) {
-    snprintf(err, cap, "Set server, username, password\nin shelf.conf.");
+    snprintf(err, cap, "Set server, username, password\nin Server settings.");
     return 0;
   }
   if (!ds_download_root[0])

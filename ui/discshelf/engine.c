@@ -77,6 +77,7 @@ int shelf_sd_ready(void) {
 }
 static void resident_reset(void);
 int shelf_init(const char *conf, char *err, size_t cap) {
+  response[0]=0;
   testmode = getenv("SHELF_TEST") != NULL;
   resident_reset();
   localpath = testmode ? getenv("SHELF_DB") : "/usr/data/fiio/db/song.db";
@@ -357,7 +358,15 @@ static int local_album(const item_t *r) {
   normalize(r->artist, artist, sizeof artist);
   normalize(r->name, album, sizeof album);
   sqlite3_stmt *s = NULL;
-  int n = 0;
+  int n = 0, members=0, complete=1;
+  if(sqlite3_prepare_v2(db,"SELECT path,size FROM album_members WHERE server=? AND album=?",-1,&s,NULL)==SQLITE_OK){
+    sqlite3_bind_text(s,1,ds_server,-1,SQLITE_STATIC);sqlite3_bind_text(s,2,r->id,-1,SQLITE_STATIC);
+    int rc;while((rc=sqlite3_step(s))==SQLITE_ROW){members++;if(!file_exists((const char*)sqlite3_column_text(s,0),sqlite3_column_int64(s,1)))complete=0;}
+    if(rc!=SQLITE_DONE)complete=0;
+  }
+  sqlite3_finalize(s);s=NULL;
+  if(members==r->count && complete)return 1;
+  if(members)n=2;
   if (sqlite3_prepare_v2(db,
                          "SELECT path FROM local WHERE album=? AND artist=?",
                          -1, &s, NULL) == SQLITE_OK) {
@@ -573,6 +582,12 @@ static int save_manifest(const item_t *r, const char *path) {
     ok = sqlite3_step(s) == SQLITE_DONE;
   }
   sqlite3_finalize(s);
+  if(ok){
+    char title[STR],artist[STR],album[STR];normalize(r->name,title,sizeof title);normalize(r->artist,artist,sizeof artist);normalize(r->album,album,sizeof album);
+    if(sqlite3_prepare_v2(db,"INSERT INTO local SELECT ?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM local WHERE path=?)",-1,&s,NULL)==SQLITE_OK){
+      sqlite3_bind_text(s,1,title,-1,SQLITE_TRANSIENT);sqlite3_bind_text(s,2,artist,-1,SQLITE_TRANSIENT);sqlite3_bind_text(s,3,album,-1,SQLITE_TRANSIENT);sqlite3_bind_text(s,4,path,-1,SQLITE_TRANSIENT);sqlite3_bind_text(s,5,path,-1,SQLITE_TRANSIENT);ok=sqlite3_step(s)==SQLITE_DONE;
+    }else ok=0;sqlite3_finalize(s);
+  }
   return ok;
 }
 static int download_track(item_t r, int *saved, int *skipped) {
@@ -607,8 +622,20 @@ static int download_track(item_t r, int *saved, int *skipped) {
   if(sqlite3_prepare_v2(db,"SELECT path FROM downloads WHERE server=? AND id=?",-1,&own,NULL)!=SQLITE_OK)return 0;
   sqlite3_bind_text(own,1,ds_server,-1,SQLITE_STATIC);sqlite3_bind_text(own,2,r.id,-1,SQLITE_STATIC);
   int orc=sqlite3_step(own);
-  if(orc==SQLITE_ROW){const char *old=(const char*)sqlite3_column_text(own,0);owned=old && !strcmp(old,path);}
+  if(orc==SQLITE_ROW){
+    const char*old=(const char*)sqlite3_column_text(own,0);size_t len=strlen(ds_download_root);
+    owned=old && !strncmp(old,ds_download_root,len) && old[len]=='/' && !strstr(old,"/../") && strlen(old)<sizeof path;
+    if(owned){
+      const char*slash=strrchr(old,'/');size_t plen=slash?(size_t)(slash-old):0;
+      if(!plen||plen>=sizeof dir)owned=0;
+      else {char parent[sizeof dir];memcpy(parent,old,plen);parent[plen]=0;
+        if(!dirs(parent))owned=0;
+        else {strcpy(dir,parent);strcpy(path,old);}
+      }
+    }
+  }
   sqlite3_finalize(own);if(orc!=SQLITE_ROW && orc!=SQLITE_DONE)return 0;
+  snprintf(temp,sizeof temp,"%s.part",path);
   if(dup && ds_shared.replace && !owned){(*skipped)++;return 1;}
   struct stat previous, st;int existed=!lstat(path,&previous);
   if(existed && (!S_ISREG(previous.st_mode) || (!owned && !file_exists(path,r.size)))){
@@ -718,19 +745,40 @@ static void album_cover(const char *id) {
     rename(tmp, path);
   unlink(tmp);
 }
+static int member_save(const char*album,const item_t*r){
+ sqlite3_stmt*s=NULL;char path[1600]="";
+ if(sqlite3_prepare_v2(db,"SELECT path FROM downloads WHERE server=? AND id=?",-1,&s,NULL)!=SQLITE_OK)return 0;
+ sqlite3_bind_text(s,1,ds_server,-1,SQLITE_STATIC);sqlite3_bind_text(s,2,r->id,-1,SQLITE_STATIC);
+ if(sqlite3_step(s)==SQLITE_ROW)snprintf(path,sizeof path,"%s",sqlite3_column_text(s,0));sqlite3_finalize(s);
+ int64_t size=r->size;
+ if(!path[0]){
+   char title[STR],artist[STR],name[STR];normalize(r->name,title,sizeof title);normalize(r->artist,artist,sizeof artist);normalize(r->album,name,sizeof name);
+   if(sqlite3_prepare_v2(db,"SELECT path FROM local WHERE title=? AND album=? AND artist=?",-1,&s,NULL)!=SQLITE_OK)return 0;
+   sqlite3_bind_text(s,1,title,-1,SQLITE_TRANSIENT);sqlite3_bind_text(s,2,name,-1,SQLITE_TRANSIENT);sqlite3_bind_text(s,3,artist,-1,SQLITE_TRANSIENT);
+   while(sqlite3_step(s)==SQLITE_ROW){const char*p=(const char*)sqlite3_column_text(s,0);struct stat st;if(p&&strlen(p)<sizeof path&&!lstat(p,&st)&&S_ISREG(st.st_mode)&&st.st_size>0){strcpy(path,p);size=st.st_size;break;}}
+   sqlite3_finalize(s);if(!path[0])return 0;
+   /* Presence only: this does not add a download manifest or grant overwrite ownership. */
+ }
+ if(sqlite3_prepare_v2(db,"INSERT OR REPLACE INTO album_members VALUES(?,?,?,?,?)",-1,&s,NULL)!=SQLITE_OK)return 0;
+ sqlite3_bind_text(s,1,ds_server,-1,SQLITE_STATIC);sqlite3_bind_text(s,2,album,-1,SQLITE_STATIC);sqlite3_bind_text(s,3,r->id,-1,SQLITE_STATIC);sqlite3_bind_text(s,4,path,-1,SQLITE_TRANSIENT);sqlite3_bind_int64(s,5,size);
+ int ok=sqlite3_step(s)==SQLITE_DONE;sqlite3_finalize(s);return ok;
+}
 static int download_album(const char *id, int *saved, int *skipped) {
   char encoded[500], args[600];
   ds_url_encode(id, encoded, sizeof encoded);
   snprintf(args, sizeof args, "id=%s", encoded);
   if (!fetch("getAlbum", args, "tracks"))
     return 0;
+  sqlite3_stmt*clear=NULL;
+  if(sqlite3_prepare_v2(db,"DELETE FROM album_members WHERE server=? AND album=?",-1,&clear,NULL)!=SQLITE_OK)return 0;
+  sqlite3_bind_text(clear,1,ds_server,-1,SQLITE_STATIC);sqlite3_bind_text(clear,2,id,-1,SQLITE_STATIC);int cleared=sqlite3_step(clear)==SQLITE_DONE;sqlite3_finalize(clear);if(!cleared)return 0;
   int before = *saved;
   int64_t cursor = 0;
   item_t r = {0};
   int rc;
   while ((rc = next_item("tracks", TRACKS, &cursor, &r)) == 1) {
     if (atomic_load(&ds_abort_job) || atomic_load(&ds_stopping) ||
-        !download_track(r, saved, skipped))
+        !download_track(r, saved, skipped) || !member_save(id,&r))
       return 0;
   }
   if (rc == 0 && *saved > before)
@@ -786,7 +834,7 @@ void *shelf_worker(void *arg) {
       "PRAGMA cache_size=-128; PRAGMA mmap_size=0; PRAGMA temp_store=FILE; "
       "PRAGMA journal_mode=DELETE; PRAGMA max_page_count=32768",
       NULL, NULL, NULL);
-  if (!execsql("CREATE TABLE IF NOT EXISTS downloads(server TEXT,id TEXT,path "
+  if (!execsql("CREATE TABLE IF NOT EXISTS album_members(server TEXT,album TEXT,id TEXT,path TEXT,size INTEGER,PRIMARY KEY(server,album,id));CREATE TABLE IF NOT EXISTS downloads(server TEXT,id TEXT,path "
                "TEXT,size INTEGER,title TEXT,PRIMARY KEY(server,id)); DROP "
                "TABLE IF EXISTS album_build; DROP TABLE IF EXISTS album_catalogue; DROP TABLE IF EXISTS artists; DROP TABLE IF EXISTS browse; DROP "
                "TABLE IF EXISTS tracks; DROP TABLE IF EXISTS artist_jobs"))
@@ -857,7 +905,7 @@ void shelf_close(void) {
     sqlite3_close(db);
     db = NULL;
   }
-  unlink(response);
+  if(response[0])unlink(response);response[0]=0;
   if (lockfd >= 0) {
     close(lockfd);
     lockfd = -1;

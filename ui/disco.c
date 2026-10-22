@@ -16,6 +16,7 @@
  *     Hidden on full-screen tools (EQ, Search, keyboard, Quick Settings, saver, Now Playing...).
  * Music itself (the sharp cover, clock, transport) is disco_home.c. */
 #include "screens.h"
+#include "discshelf.h"
 #include "orbit.h"
 #include "theme.h"
 #include "theme_kit.h"
@@ -173,7 +174,7 @@ static int g_menu[MAXM], g_nmenu, g_cur;           /* active items (indices into
 static dsec_t menu_section(int id){
     if(id>=0&&id<NSEC)return SEC[id];
     const menu_app_t *app=menu_apps_get(id-NSEC);
-    return (dsec_t){app?app->id:"",app?app->name:"App unavailable",LV_SYMBOL_FILE,SCR_APPLAND,NULL,0};
+    return (dsec_t){app?app->id:"",app?app->name:"App unavailable",LV_SYMBOL_FILE,app&&!strcmp(app->exec,APP_BUILTIN_SHELF)?SCR_SHELF:SCR_APPLAND,NULL,0};
 }
 static int sec_find(const char *id, size_t n){ for(int i = 0; i < NSEC; i++) if(strlen(SEC[i].id) == n && !strncmp(SEC[i].id, id, n)) return i; return -1; }
 static int menu_has_screen(int scr);
@@ -475,6 +476,7 @@ static void go_section(int idx, int dir){
     if(g_menu[idx] >= NSEC){                                         /* an installed app: its landing page, never a straight launch */
         const menu_app_t *app=menu_apps_get(g_menu[idx]-NSEC);
         if(!app){ ui_toast("That app is not installed"); return; }
+        if(!strcmp(app->exec,APP_BUILTIN_SHELF)){discshelf_open();onboarding_discovered(HINT_NAV);return;}
         applanding_icon(app->icon);
         applanding_show(app->name, app->tagline, app->about, app->button, app->exec);
         if(screen_current()==SCR_APPLAND)onboarding_discovered(HINT_NAV);

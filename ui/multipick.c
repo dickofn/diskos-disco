@@ -130,8 +130,8 @@ static void row_cb(lv_event_t *e){
     lv_obj_t *r = lv_event_get_current_target(e);
     mp_host_t *h = host_of(r); if(!h) return;
     int i = (int)(intptr_t)lv_event_get_user_data(e);
-    if(!h->can_pick || h->can_pick())if(mp_swipe_event(&g_sw,e)){toggle(h,r,i);return;}
-    if(c==LV_EVENT_PRESSED || c==LV_EVENT_PRESSING)return;
+    if(c==LV_EVENT_PRESSED){mp_swipe_event(&g_sw,e);return;}
+    if(c==LV_EVENT_PRESSING){if((!h->can_pick || h->can_pick())&&mp_swipe_event(&g_sw,e))toggle(h,r,i);return;}
     if(!h->on) return;
     if(c == LV_EVENT_SHORT_CLICKED || c == LV_EVENT_CLICKED){ if(c == LV_EVENT_SHORT_CLICKED) toggle(h, r, i); lv_event_stop_processing(e); }
     else if(c == LV_EVENT_LONG_PRESSED){ lv_event_stop_processing(e); if(h->more) lv_obj_send_event(h->more, LV_EVENT_CLICKED, NULL); }
