@@ -1,17 +1,17 @@
 {
   "version": "2.6.2",
-  "revision": "Disc Shelf development test: Navidrome/SMB3 wording, batched Navidrome SD writes and smoothed speed display",
+  "revision": "Disc Shelf and SongSphere development test: static themed guards, Navidrome/SMB3 wording, batched SD writes and download speed",
   "baseline": "v2.6.2",
-  "source_commit": "e7cf9629b82925a5fff38dc485492ad55c4ff08e",
-  "ui_source_sha256": "3fe2f378589ed5c2d131c421191ec4fb51e803db6f713f70392502ef96c4727a",
+  "source_commit": "923743d87994914b9bb9fe423e27a81882e69c18",
+  "ui_source_sha256": "75cd1d944d58bc8d6d19fd0fca6a8114bd21356e31f8215049beafdd4470c314",
   "ui_source_hash_recipe": "sorted tracked ui paths: path + NUL + file bytes + NUL",
   "compiler": "Repository prebuilt toolchain-gcc11.2: GCC 11.2.0, musl 1.2.6",
   "abi": "static little-endian MIPS32r2, o32, FP64, NaN2008",
-  "status": "DEVELOPMENT TEST BUILD. HTTP/SQLite regressions, buffered-transfer fault tests and three-theme LVGL renders passed. On-device speed improvement is unmeasured. No new release tag or Bluetooth changes.",
+  "status": "DEVELOPMENT TEST BUILD. HTTP/SQLite regressions, buffered-transfer fault tests and three-theme LVGL/guard tests passed. On-device speed improvement is unmeasured. No release tag or Bluetooth changes.",
   "binary": {
-    "sha256": "10dc25cee25c769e4a72f318843987b774f1506b8a28b2916d2324a7213a29e2",
-    "md5": "ee38b396322a5d9c0cc3b4ee6d066d38",
-    "bytes": 6373628
+    "sha256": "c65c8e4b3b0e0cba13635a75c4f4025105e9584e9de95b8ea78f51962bf79084",
+    "md5": "5fca276dcb03ac4ef4d0fba8bc9409a5",
+    "bytes": 6373632
   },
   "artwork_helper": {
     "bytes": 119424,
