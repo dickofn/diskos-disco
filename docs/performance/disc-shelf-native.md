@@ -72,3 +72,9 @@ GCC 11.2 repository toolchain build, static little-endian MIPS32r2/o32, FP64, Na
 - Exact binary/source identity is recorded in payload/mq_ui.build.json.
 
 This does not measure peak device RSS or physical battery consumption.
+
+## SMB3 development follow-up
+
+Final SMB3 test payload: 6,373,628 bytes, versus 6,219,588 for the previous native Disc Shelf payload: +154,040 bytes (150.4 KiB). MIPS ELF text/data/BSS for the preceding equivalent link were 6,297,212 / 72,964 / 4,456,344 bytes, versus 6,146,656 / 71,668 / 4,430,512 for the native baseline. Fixed BSS increased about 25.2 KiB; actual peak RSS/current draw require hardware measurements. Source changes also include the reviewed layout/icon/typography fixes.
+
+Protocol work is confined to the existing on-demand worker. Directory query buffers are bounded to 64 KiB, file reads to 32 KiB, and UI data stays at 32 rows. Idle SMB workers wait on the existing condition variable. There is no automatic discovery, keepalive, sync or refresh timer. Session/password and source-selection details are documented in `docs/plans/disc-shelf-smb3.md`.

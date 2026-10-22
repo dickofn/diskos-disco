@@ -1,21 +1,26 @@
 {
   "version": "2.6.2",
-  "revision": "Disc Shelf native development build: themed library browsing, Download-only swipe selection, A-Z grid/ring, server setup and safe optional replacement",
+  "revision": "Disc Shelf SMB3 development test: exclusive Navidrome/SMB source choice, safe folder/file downloads, session-only credentials and themed native UI",
   "baseline": "v2.6.2",
-  "source_commit": "9c90a8553f9b4378d9a03bf842c4763a97d54f18",
-  "ui_source_sha256": "5ef5f8706aa34d4d11bde44913bf35180abbec477d57840bbcbb90fa6a74fe58",
+  "source_commit": "4a048e892790b05bd6d68d7314c926414565e1d2",
+  "ui_source_sha256": "22d1bed1d0bda6db7c49a7b3894f4be1d3ee6e8e6bf6a223d579d49a7d8be7b4",
   "ui_source_hash_recipe": "sorted tracked ui paths: path + NUL + file bytes + NUL",
   "compiler": "Repository prebuilt toolchain-gcc11.2: GCC 11.2.0, musl 1.2.6",
   "abi": "static little-endian MIPS32r2, o32, FP64, NaN2008",
-  "status": "DEVELOPMENT TEST BUILD. Native LVGL/HTTP/SQLite/lifecycle tests passed; physical Disc acceptance pending. Not the public 2.6.2 payload. No Bluetooth changes.",
+  "status": "DEVELOPMENT TEST BUILD. SMB3 wire-fixture, Navidrome, credential, lifecycle and LVGL tests passed. Physical Disc/NAS compatibility, memory and power measurements pending. No Bluetooth changes. No release tag.",
   "binary": {
-    "sha256": "e11ceed5f778bb9ad691568c5d837bc981324e4a3bfbb4dbb1253e76008ccb4f",
-    "md5": "72ea4e6458cf2d4a1132d4be7ccd54f8",
-    "bytes": 6219588
+    "sha256": "a47724e503772eb1b57916633b1a748b5fb56cdd816a1171b9fccea47a564f98",
+    "md5": "4cbec02cf038a77fd39f1548e909fe02",
+    "bytes": 6373628
   },
   "artwork_helper": {
     "bytes": 119424,
     "sha256": "e45d44851deefb4fa7dbbd3e3d01bfe701c66fad0c253cc796fe9a1fa02419da",
     "note": "Roulette uses the capped built-in decoder; the raw mq_ui works with the previously flashed read-only helper."
+  },
+  "libsmb2": {
+    "tag": "libsmb2-6.3",
+    "commit": "2bcb014b23a8c8cccf534eea8bda2fe5df453cfd",
+    "license": "LGPL-2.1-or-later"
   }
 }
