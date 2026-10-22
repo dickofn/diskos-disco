@@ -60,3 +60,15 @@ hardware battery consumption, peak runtime memory or physical SD-removal behavio
 
 The old standalone archive/source remains available for older firmware; the complete ZIP no longer duplicates its
 executable inside `apps/`. Existing device executables/configuration are not deleted, preserving rollback compatibility.
+
+## Final device build size
+
+GCC 11.2 repository toolchain build, static little-endian MIPS32r2/o32, FP64, NaN2008:
+
+- Public 2.6.2 payload: 6,160,032 bytes.
+- Native Disc Shelf test payload: 6,219,588 bytes.
+- Increase: 59,556 bytes (58.16 KiB, about 0.97%).
+- ELF BSS grows by 10,136 bytes; the large app buffers remain on-demand allocations.
+- Exact binary/source identity is recorded in payload/mq_ui.build.json.
+
+This does not measure peak device RSS or physical battery consumption.

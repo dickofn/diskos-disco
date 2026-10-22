@@ -1,17 +1,17 @@
 {
   "version": "2.6.2",
-  "revision": "Bluetooth: born on the right codec for known headphones (real BlueALSA state, safe background restarts, fallback for other headphones), known-good codec marks, Connected pop-up with name and codec, Bluetooth screen polish; clock field polish with Clock and info (battery percentage, weather); back-swipe arrow on the track pop-up",
-  "baseline": "v2.6.1",
-  "source_commit": "05994978be3323cc8f1e152478642bc77a0a147e",
-  "ui_source_sha256": "a911706f194708d4d1fb93bb15ed0886a5ec653c252bad53d244b03ced6ba625",
+  "revision": "Disc Shelf native development build: themed library browsing, Download-only swipe selection, A-Z grid/ring, server setup and safe optional replacement",
+  "baseline": "v2.6.2",
+  "source_commit": "9c90a8553f9b4378d9a03bf842c4763a97d54f18",
+  "ui_source_sha256": "5ef5f8706aa34d4d11bde44913bf35180abbec477d57840bbcbb90fa6a74fe58",
   "ui_source_hash_recipe": "sorted tracked ui paths: path + NUL + file bytes + NUL",
   "compiler": "Repository prebuilt toolchain-gcc11.2: GCC 11.2.0, musl 1.2.6",
   "abi": "static little-endian MIPS32r2, o32, FP64, NaN2008",
-  "status": "Born-on-codec tested by hand on the owner's Disc (LDAC); kernel connection entries confirmed there. Review fixes, marks, pop-up and screen behaviour covered by bt_born_test and bt_autoroute_test; layouts checked with host renders. Not yet tried on a Disc as a whole.",
+  "status": "DEVELOPMENT TEST BUILD. Native LVGL/HTTP/SQLite/lifecycle tests passed; physical Disc acceptance pending. Not the public 2.6.2 payload. No Bluetooth changes.",
   "binary": {
-    "bytes": 6160032,
-    "sha256": "132c3865e736509d1dc182c4faeadc94a02eaf66eaa908368e963ca364db731d",
-    "md5": "314968068a645b0c93d50004f89ac89f"
+    "sha256": "e11ceed5f778bb9ad691568c5d837bc981324e4a3bfbb4dbb1253e76008ccb4f",
+    "md5": "72ea4e6458cf2d4a1132d4be7ccd54f8",
+    "bytes": 6219588
   },
   "artwork_helper": {
     "bytes": 119424,
