@@ -46,6 +46,9 @@ int ds_parse_response(const char *file, int (*emit)(const item_t *, void *),
                    void *ctx);
 void ds_url_encode(const char *s, char *out, size_t cap);
 void ds_status_text(const char *fmt, ...);
+/* Worker-scoped Wi-Fi PM guard; restore token is -1 when no change is needed. */
+int ds_wifi_copy_begin(void);
+void ds_wifi_copy_end(int previous);
 int ds_available_memory(void);
 int ds_storage_headroom(uint64_t extra);
 int shelf_sd_ready(void);

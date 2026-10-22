@@ -211,7 +211,7 @@ void *ds_smb_worker(void*unused){
  while(!atomic_load(&ds_stopping)){
   request_t req;int command,n,replace;pthread_mutex_lock(&ds_shared.mu);while(!ds_shared.command&&!atomic_load(&ds_stopping))pthread_cond_wait(&ds_shared.wake,&ds_shared.mu);if(atomic_load(&ds_stopping)){pthread_mutex_unlock(&ds_shared.mu);break;}command=ds_shared.command;ds_shared.command=0;req=ds_shared.req;n=ds_shared.npicks;replace=ds_shared.replace;pthread_mutex_unlock(&ds_shared.mu);
   int ok;
-  if(command==2)ok=download_selected(s,n,replace);else{char path[PATHCAP];ok=resolve(s,req.id,path);if(ok&&command!=3)ok=list_directory(s,path,0);if(ok)ok=publish(s,req);}
+  if(command==2){int previous_pm=ds_wifi_copy_begin();ok=download_selected(s,n,replace);ds_wifi_copy_end(previous_pm);}else{char path[PATHCAP];ok=resolve(s,req.id,path);if(ok&&command!=3)ok=list_directory(s,path,0);if(ok)ok=publish(s,req);}
   if(!ok)ds_status_text(cancelled()?"Cancelled. Completed files kept.":"SMB request failed. Check connection or card, then retry.");
   pthread_mutex_lock(&ds_shared.mu);if(!ok&&command!=2){ds_shared.count=ds_shared.total_count=0;ds_shared.view=req.view;}ds_shared.busy=0;ds_shared.result_generation=req.generation;ds_shared.done=command==2?(ok?1:2):0;ds_shared.revision++;pthread_mutex_unlock(&ds_shared.mu);
  }

@@ -83,6 +83,67 @@ static uint64_t mono_ms(void) {
   clock_gettime(CLOCK_MONOTONIC, &t);
   return (uint64_t)t.tv_sec * 1000 + t.tv_nsec / 1000000;
 }
+/* wl runs only at copy boundaries, never on the UI thread or an idle timer.
+ * Fixed executable/arguments; no shell, network request or persistent setting. */
+#ifndef DS_WL_PATH
+#define DS_WL_PATH "/usr/bin/wl"
+#endif
+static int wifi_pm_command(const char *value, int *mode) {
+  int pipes[2];
+  if (pipe2(pipes,O_CLOEXEC|O_NONBLOCK)) return 0;
+  posix_spawn_file_actions_t fa;posix_spawn_file_actions_init(&fa);
+  posix_spawn_file_actions_adddup2(&fa,pipes[1],STDOUT_FILENO);
+  posix_spawn_file_actions_addopen(&fa,STDERR_FILENO,"/dev/null",O_WRONLY,0);
+  posix_spawn_file_actions_addclose(&fa,pipes[0]);
+  posix_spawn_file_actions_addclose(&fa,pipes[1]);
+  posix_spawnattr_t attr;posix_spawnattr_init(&attr);
+  posix_spawnattr_setflags(&attr,POSIX_SPAWN_SETPGROUP);posix_spawnattr_setpgroup(&attr,0);
+  char *argv[]={"wl","-i","wlan0","PM",(char*)value,NULL};
+  pid_t child;int rc=posix_spawn(&child,DS_WL_PATH,&fa,&attr,argv,environ);
+  posix_spawn_file_actions_destroy(&fa);posix_spawnattr_destroy(&attr);close(pipes[1]);
+  if(rc){close(pipes[0]);return 0;}
+  uint64_t began=mono_ms();int status=0,reaped=0,valid=1;size_t used=0;char output[64];
+  while(mono_ms()-began<1000){
+    ssize_t n=read(pipes[0],output+used,sizeof output-1-used);
+    if(n>0){used+=(size_t)n;if(used==sizeof output-1){valid=0;break;}}
+    else if(n<0 && errno!=EAGAIN && errno!=EINTR){valid=0;break;}
+    pid_t r=waitpid(child,&status,WNOHANG);
+    if(r==child){reaped=1;break;}
+    if(r<0 && errno!=EINTR){valid=0;break;}
+    /* Do not spin on POLLHUP if the helper closes stdout before exiting. */
+    poll(NULL,0,20);
+  }
+  if(reaped && used<sizeof output-1){
+    ssize_t n=read(pipes[0],output+used,sizeof output-1-used);
+    if(n>0)used+=(size_t)n;
+  }
+  close(pipes[0]);
+  if(!reaped){
+    kill(-child,SIGKILL);kill(child,SIGKILL);
+    while(waitpid(child,&status,0)<0 && errno==EINTR){}
+    return 0;
+  }
+  if(!valid || !WIFEXITED(status) || WEXITSTATUS(status))return 0;
+  if(mode){
+    output[used]=0;char *end;long v=strtol(output,&end,10);
+    if(end==output || v<0 || v>2)return 0;
+    while(*end==' ' || *end=='\t' || *end=='\r' || *end=='\n')end++;
+    if(*end)return 0;*mode=(int)v;
+  }
+  return 1;
+}
+int ds_wifi_copy_begin(void){
+  int previous;
+  if(net_test || access(DS_WL_PATH,X_OK) || !wifi_pm_command(NULL,&previous) || previous==0)return -1;
+  /* Keep the restore token even if setting times out: the ioctl may have run. */
+  if(!wifi_pm_command("0",NULL))fprintf(stderr,"Disc Shelf: Wi-Fi power-save override unavailable\n");
+  return previous;
+}
+void ds_wifi_copy_end(int previous){
+  if(previous<1 || previous>2)return;
+  if(!wifi_pm_command(previous==1?"1":"2",NULL))
+    fprintf(stderr,"Disc Shelf: could not restore Wi-Fi power saving to %d\n",previous);
+}
 static int transfer_write(int fd, const unsigned char *data, size_t count) {
   while (count) {
     if (atomic_load(&ds_stopping) || atomic_load(&ds_abort_job)) return 0;

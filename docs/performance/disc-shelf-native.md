@@ -133,3 +133,27 @@ single all-song request, shuffle setting, Music destination, popup text and
 empty/refused playback handling. Playback acceptance/counts are mocked for these
 host UI tests; physical-player validation remains with the test binary. No
 background work or library-wide playlist construction is added.
+
+## Follow-up: scoped Wi-Fi power-save override
+
+Copy jobs now query `/usr/bin/wl -i wlan0 PM` once on the Shelf worker. A known
+mode 1/2 is temporarily changed to 0 and restored after the Navidrome/SMB job
+returns, before completion is published. This covers normal completion,
+cancellation and error returns, including early exits from SMB recursion. A mode
+already at 0, an unknown mode, or an unavailable utility is left alone. Browsing,
+idle and app guard screens do not run these commands. There is no reconnect,
+background poller, persistent config change or change to the user's Wi-Fi intent.
+
+Fixed arguments use direct process spawning, bounded output and a one-second
+helper deadline. Failure to override does not fail a download. A restore is still
+attempted after a timed-out/failed setter because the driver ioctl may already
+have executed. Restore failure is logged, not retried in an idle loop. Forced
+process termination or a driver/radio that is unavailable cannot guarantee
+restoration; no permanent power-saving policy is written.
+
+`python3 ui/tests/discshelf/wifi_pm_test.py` uses a fake utility to verify PM 0
+(no setter), PM 1/2 restore, unsupported/query errors, missing utility, and slow
+query/setter cleanup. Navidrome and encrypted SMB wire regressions also pass.
+Real-driver setting/restore acceptance is pending a device test. In the reported
+slow-transfer incident PM was already 0; this guard is not claimed to fix that
+incident, which cleared after reconnecting Wi-Fi. Existing v2.7.0 is not retagged.

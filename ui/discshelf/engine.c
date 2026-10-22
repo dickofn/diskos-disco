@@ -867,7 +867,9 @@ void *shelf_worker(void *arg) {
       n = ds_shared.npicks;
     }
     pthread_mutex_unlock(&ds_shared.mu);
+    int previous_pm=command==2?ds_wifi_copy_begin():-1;
     int ok = command == 1 || command == 3 ? browse(req) : download_picks(ds_shared.picks, n);
+    ds_wifi_copy_end(previous_pm);
     pthread_mutex_lock(&ds_shared.mu);
     if(!ok && command!=2){ds_shared.count=0;ds_shared.total_count=0;ds_shared.view=req.view;ds_shared.letter=req.letter;}
     ds_shared.busy = 0;
