@@ -61,6 +61,8 @@ static void start_scan(void);             /* fwd */
 static void scan_timer_cb(lv_timer_t *t);  /* fwd */
 static void scan_abort(void);             /* fwd */
 static void scan_kick(void);              /* fwd - off-thread re-enumerate (no discovery window) */
+static void bt_announce(const char *mac, const char *codec);   /* fwd - "Connected: <name> - <codec>" */
+static void bt_announce_reset(void);      /* fwd */
 static void bt_autoroute_start(void);      /* fwd */
 static void bt_autoroute_stop(void);       /* fwd */
 static void bt_remember_last(const char *mac);   /* fwd */
@@ -542,16 +544,17 @@ static int bt_codec_frame_value(const char *mac, int v, char *out, int cap){
  * One step per call (UI timer tick); returns 1 when finished (sent, unavailable, gave up, or the route changed). */
 void ui_resume_guard_arm(int reason, const char *mac);
 int bt_codec_upgrade_step(void){
-    char mac[18], f[48]; int send = -1, done = 0, mark = 0; unsigned mark_bit = 0; struct bt_probe_arg *spawn = NULL;
+    char mac[18], f[48], settled[16] = ""; int send = -1, done = 0, mark = 0; unsigned mark_bit = 0; struct bt_probe_arg *spawn = NULL;
     pthread_mutex_lock(&g_cq_mu);
     snprintf(mac, sizeof mac, "%s", g_cq.mac);
     if(!g_cq.armed || strcmp(ui_route_mac(), mac)) done = 1;                 /* cancelled or routed away: forget it */
     else if(g_cq.verifying && g_cq.state == 2){
         /* sent: wait for BlueALSA to report the new codec before calling it done (the playback hold waits on this) */
         const char *want = g_cq.want_v == 1 ? "AAC" : "LDAC";
-        if(!strcmp(g_cq.sel, want)){ done = 1; g_cq.applied = 1; mark = 1;
+        if(!strcmp(g_cq.sel, want)){ done = 1; g_cq.applied = 1; mark = 1; snprintf(settled, sizeof settled, "%s", want);
             fprintf(stderr, "bt codec: %s confirmed\n", want); fflush(stderr); }
         else if(++g_cq.verify_tries >= BT_VERIFY_TRIES){ done = 1; g_cq.applied = 1; mark = -1;
+            snprintf(settled, sizeof settled, "%s", g_cq.sel[0] ? g_cq.sel : "SBC");
             fprintf(stderr, "bt codec: %s not confirmed (selected '%s'), going on\n", want, g_cq.sel); fflush(stderr); }
         mark_bit = g_cq.want_v == 1 ? BTC_AAC : BTC_LDAC;
         g_cq.state = 0;
@@ -565,9 +568,10 @@ int bt_codec_upgrade_step(void){
             if(v != 0 && !strcmp(g_cq.sel, want)){                       /* already on it: no switch, no pause */
                 done = 1; g_cq.applied = 1;
                 fprintf(stderr, "bt codec: already %s, nothing to switch\n", want); fflush(stderr);
+                snprintf(settled, sizeof settled, "%s", want);
             }
             else if(v != 0) send = v;                                    /* applied only once confirmed (verifying) */
-            else { done = 1; g_cq.applied = 1; }
+            else { done = 1; g_cq.applied = 1; snprintf(settled, sizeof settled, "%s", g_cq.sel[0] ? g_cq.sel : "SBC"); }
         } else if(++g_cq.misses >= BT_PCM_TRIES){ done = 1; g_cq.applied = 1; }   /* no link, or its codecs never known */
         g_cq.state = 0;
     }
@@ -578,6 +582,7 @@ int bt_codec_upgrade_step(void){
     unsigned gen_now = g_cq.gen;
     pthread_mutex_unlock(&g_cq_mu);
     if(mark) bt_mark_codec(mac, mark_bit, mark > 0);      /* known-good / bad for these headphones */
+    if(settled[0]) bt_announce(mac, settled);             /* "Connected: <name> - <codec>" */
     if(send > 0 && !ui_codec_switch_gate(mac)){              /* a song is starting: switch once that settles */
         pthread_mutex_lock(&g_cq_mu); if(g_cq.gen == gen_now) g_cq.state = 0; pthread_mutex_unlock(&g_cq_mu);
         send = 0;
@@ -765,6 +770,8 @@ static void bt_autoroute_poll_cb(lv_timer_t *t){
     static int was_found = -1;
     if(was_found != -1 && found != was_found && screen_current() == SCR_BT) scan_kick();
     if(found && was_found == 0) ui_bt_codec_upgrade_arm(mac, 1);   /* the link came back: check its codec again */
+    if(!found && was_found == 1) bt_announce_reset();               /* gone: announce the next connection */
+    if(found && was_found == 0 && !bt_codec_upgrade_pending()) bt_announce(mac, "SBC");   /* SBC chosen: nothing to wait for */
     was_found = found;
     static int missing;
     if(!found){
@@ -907,9 +914,9 @@ static void bt_conn_poll_cb(lv_timer_t *t){
         int routed = ui_route_bt(g_bt_conn_mac);
         if(routed == 0){
             snprintf(g_bt_autorouted, sizeof g_bt_autorouted, "%s", g_bt_conn_mac);
-            ui_toast("Connected");
+            if(!bt_codec_upgrade_pending()) bt_announce(g_bt_conn_mac, "SBC");   /* else: announced once the codec is known */
         } else if(routed == -2){            /* deferred while a song starts: the auto-route poll routes it shortly */
-            ui_toast("Connected");
+            ui_toast("Connecting...");
         } else {
             ui_toast("Paired - audio stays on player");
         }
@@ -1330,6 +1337,25 @@ static int             g_scan_done = 0;      /* [g_scan_mu] worker finished -> m
 static int             g_scan_running = 0;   /* [g_scan_mu] a worker is in flight */
 static unsigned        g_scan_gen = 0;       /* [g_scan_mu] bumped per scan; worker tags its result */
 static lv_timer_t     *g_scanpoll_timer;
+/* "Connected: <headphones> - <codec>", once per connection, when the codec is settled (2.6.2): after a tap and when
+ * headphones reconnect by themselves. The codec is what BlueALSA reports running; the name comes from the device list,
+ * or bluetoothctl if it isn't there. bt_announce_reset() when the link goes, so the next connection is announced. */
+static char g_announced[20];
+static void bt_announce_reset(void){ g_announced[0] = 0; }
+static void bt_announce(const char *mac, const char *codec){
+    if(!bt_mac_valid(mac) || !strcmp(g_announced, mac)) return;
+    snprintf(g_announced, sizeof g_announced, "%s", mac);
+    char name[64] = "";
+    pthread_mutex_lock(&g_scan_mu);
+    for(int i = 0; i < g_scan_n && i < 40; i++) if(!strcasecmp(g_scan_res[i].mac, mac)){ snprintf(name, sizeof name, "%s", g_scan_res[i].name); break; }
+    pthread_mutex_unlock(&g_scan_mu);
+    if(!name[0]){ char cmd[96], info[1024]; snprintf(cmd, sizeof cmd, "bluetoothctl info %s 2>/dev/null", mac);
+                  if(run_cap_to(cmd, info, sizeof info, 1500) > 0) bt_info_prop(info, "Name:", name, sizeof name); }
+    char msg[128];
+    if(name[0]) snprintf(msg, sizeof msg, "Connected: %s\n%s", name, codec && codec[0] ? codec : "SBC");   /* name, then codec */
+    else snprintf(msg, sizeof msg, "Connected\n%s", codec && codec[0] ? codec : "SBC");
+    ui_toast(msg);
+}
 static int             g_scanpoll_n = 0;
 static int             g_scan_pending = 0;   /* main-thread: a re-enumerate was requested while a worker ran */
 

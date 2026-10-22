@@ -39,6 +39,10 @@ static int screen_current(void){ return cur_screen; }
 static void scan_kick(void){ kicks++; }
 static int rearms, borns; void ui_bt_codec_upgrade_arm(const char *m, int fresh){ (void)m; if(fresh) rearms++; }
 static void bt_alsa_rearm_born(void){ borns++; }
+static int upgrade_pending, announces, resets;
+int bt_codec_upgrade_pending(void){ return upgrade_pending; }
+static void bt_announce(const char *m, const char *c){ (void)m; (void)c; announces++; }
+static void bt_announce_reset(void){ resets++; }
 ''' + fn("static int run_cap_bounded(") + "\n" + fn("static int bt_mac_valid(") + "\n" + fn("static void bt_autoroute_poll_cb(") + r'''
 static void poll(int m, int n){ mode = m; for(int i = 0; i < n; i++){ bt_autoroute_poll_cb(NULL); now += 3000; } }
 int main(void){
@@ -62,6 +66,12 @@ int main(void){
     rearms = 0; poll(1, 2); poll(0, 2); poll(1, 1); assert(rearms == 1);
     borns = 0; poll(0, 3); assert(borns == 1); poll(0, 3); assert(borns == 1);   /* really gone: prepared once */
     puts("PASS a link that comes back re-checks its codec; a real disconnect prepares BlueALSA once");
+    /* 2.6.2: "Connected: <name> - SBC" once when an SBC link appears (no codec step); again after it went and came back */
+    announces = 0; resets = 0; upgrade_pending = 0; poll(0, 1); poll(1, 3); assert(announces == 1);
+    poll(0, 1); assert(resets >= 1); poll(1, 2); assert(announces == 2);
+    upgrade_pending = 1; poll(0, 1); poll(1, 1); assert(announces == 2);    /* AAC/LDAC: announced by the codec step */
+    upgrade_pending = 0;
+    puts("PASS the Connected popup comes once per connection (by the codec step when AAC/LDAC is on its way)");
     return 0;
 }
 '''
