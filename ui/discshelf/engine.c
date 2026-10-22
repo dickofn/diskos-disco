@@ -627,7 +627,6 @@ static int download_track(item_t r, int *saved, int *skipped) {
   }
   char title[120], dir[1300], path[1600], temp[1630],encoded[500],args[600];
   safe_name(r.name,title,sizeof title);track_directory(&r,dir,sizeof dir);
-  if(!dirs(dir))return 0;
   path[0]=0;
   /* Replace only this server's exact ID, never a tag-only match in the user's library. */
   int owned=0; sqlite3_stmt *own=NULL;
@@ -647,7 +646,7 @@ static int download_track(item_t r, int *saved, int *skipped) {
     }
   }
   sqlite3_finalize(own);if(orc!=SQLITE_ROW && orc!=SQLITE_DONE)return 0;
-  if(!owned && !track_free_path(&r,dir,title,path,sizeof path)){ds_status_text("Cannot choose a free filename; kept existing files.");return 0;}
+  if(!owned && (!dirs(dir) || !track_free_path(&r,dir,title,path,sizeof path))){ds_status_text("Cannot choose a free filename; kept existing files.");return 0;}
   snprintf(temp,sizeof temp,"%s.part",path);
   if(dup && ds_shared.replace && !owned){(*skipped)++;return 1;}
   struct stat previous, st;int existed=!lstat(path,&previous);
