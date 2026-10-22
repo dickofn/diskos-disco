@@ -661,7 +661,7 @@ Apps that don't describe themselves get a plain page: their first letter, "Insta
 makers can set the rest in the app's `app.conf` (next to `name=` and `exec=`):
 
 ```ini
-tagline=Your Navidrome, on the card.
+tagline=Your music, to go.
 about=Browse your server and save\noriginal files to the card.
 button=Open Disc Shelf
 ```
@@ -729,8 +729,8 @@ Album Roulette is **built in since 2.2.0**. If you installed the separate app be
 
 ## Disc Shelf
 
-**Your Navidrome, on the card.** The native Disc Shelf integration uses your theme and the normal Library layout.
-Open it in All apps, set your server under **Server**, and browse artists, albums and tracks.
+**Your music, to go.** The native Disc Shelf integration uses your theme and the normal Library layout.
+Open it in All apps and choose **Navidrome** or **SMB3** under **Server**. Browse artists, albums and tracks from Navidrome, or folders and files from an SMB3 share.
 
 Swipe from the middle to select, then **Download**. Choose **Missing only** to finish partial albums without touching
 existing songs, or **Download again** to safely replace matching Disc Shelf originals. The radio colour keeps the

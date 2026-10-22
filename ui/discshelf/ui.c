@@ -613,7 +613,7 @@ static void build(void) {
 void discshelf_create(lv_obj_t *r){host_root=r;}
 void discshelf_landing(void){
  applanding_icon(NULL);
- applanding_show("Disc Shelf","Your Navidrome, on the card.","Take your music with you.","Open Disc Shelf",APP_BUILTIN_SHELF);
+ applanding_show("Disc Shelf","Your music, to go.","Navidrome or SMB3.","Open Disc Shelf",APP_BUILTIN_SHELF);
 }
 void discshelf_open(void){
  preview_mode=0;

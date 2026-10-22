@@ -11,7 +11,7 @@ lv_obj_t *shelf_brand_icon(lv_obj_t *p,int x,int y,int size){
  lv_obj_t *l=lv_label_create(p);lv_obj_set_style_text_color(l,TC(ACCENT_PRIMARY),0);kit_keep(l);
  disco_vec_icon(l,"@shelf",size);lv_obj_set_pos(l,x,y);return l;
 }
-static lv_obj_t *status_label,*browse_button,*home_exit,*source_label;
+static lv_obj_t *status_label,*browse_button,*home_exit;
 static lv_obj_t *txt(lv_obj_t *p,const char *s,int x,int y,int w,const lv_font_t *f){
  lv_obj_t *l=lv_label_create(p);lv_obj_set_pos(l,x,y);lv_obj_set_width(l,w);lv_label_set_text(l,s);lv_obj_set_style_text_font(l,f,0);lv_obj_set_style_text_color(l,TC(TEXT_PRIMARY),0);lv_label_set_long_mode(l,LV_LABEL_LONG_DOT);return l;
 }
@@ -59,7 +59,7 @@ lv_obj_t *shelf_home_create(lv_obj_t *parent,lv_event_cb_t browse,lv_event_cb_t 
  lv_obj_t *group=box(parent,0,0,360,360,TC(CANVAS),0,0);shelf(group);
  shelf_brand_icon(group,158,32,44);
  lv_obj_t *l=txt(group,"Disc Shelf",28,88,304,TF(UI_40));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);
- source_label=l=txt(group,"Navidrome browser",40,139,280,TF(UI_20));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_set_style_text_color(l,TC(TEXT_SECONDARY),0);
+ l=txt(group,"Navidrome or SMB3",40,139,280,TF(UI_20));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_set_style_text_color(l,TC(TEXT_SECONDARY),0);
  browse_button=pill(group,"Browse collection",57,181,246,54,TF(UI_24));
  lv_obj_set_style_border_width(browse_button,2,0);lv_obj_set_style_border_color(browse_button,TC(ACCENT_PRIMARY),0);lv_obj_set_style_border_opa(browse_button,150,0);
  lv_obj_add_event_cb(browse_button,browse,LV_EVENT_SHORT_CLICKED,(void *)(intptr_t)ARTISTS);
@@ -70,8 +70,7 @@ lv_obj_t *shelf_home_create(lv_obj_t *parent,lv_event_cb_t browse,lv_event_cb_t 
 }
 lv_obj_t *shelf_home_exit(void){return home_exit;}
 void shelf_home_status(const char *text,int busy){
- int smb=atomic_load(&ds_source)==DS_SMB;const char*caption=smb?"SMB3 file browser":"Navidrome browser";
- if(strcmp(lv_label_get_text(source_label),caption))lv_label_set_text(source_label,caption);
+ int smb=atomic_load(&ds_source)==DS_SMB;
  lv_obj_t*label=lv_obj_get_child(browse_button,0);const char*action=smb?"Browse files":"Browse collection";if(strcmp(lv_label_get_text(label),action))lv_label_set_text(label,action);
  if(strcmp(lv_label_get_text(status_label),text))lv_label_set_text(status_label,text);
  if(busy)lv_obj_add_state(browse_button,LV_STATE_DISABLED);else lv_obj_remove_state(browse_button,LV_STATE_DISABLED);
