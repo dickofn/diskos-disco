@@ -11,6 +11,7 @@ diskOS remains beta software; version numbers do not imply broad hardware or fea
 - Bluetooth: headphones known to support the chosen codec connect straight on AAC or LDAC (BlueALSA started preferring
   it), so there's no switch and no pause; unknown headphones work as before and are learned; other headphones get the
   normal order. Tested by hand on a Disc; the automatic version not yet.
+- The Bluetooth screen updates when headphones connect or disconnect while it's open.
 
 [2.6.2 release notes](docs/releases/v2.6.2.md)
 

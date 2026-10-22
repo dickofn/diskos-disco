@@ -733,6 +733,12 @@ static void bt_autoroute_poll_cb(lv_timer_t *t){
      * route record goes too, so the same headphones coming back get the full routing sequence, not "already routed".
      * Fewer than that changes nothing at all (not even the latch or a pending codec switch): a single empty answer
      * during a codec switch or a busy moment must never lead to a re-route. */
+    /* The Bluetooth screen only lists devices when opened; when the audio link appears or goes (headphones switched
+     * on or off) while it's showing, re-read the devices so "Connected - LDAC" doesn't linger. A quiet re-read of the
+     * known devices (no discovery window), only on a change. */
+    static int was_found = -1;
+    if(was_found != -1 && found != was_found && screen_current() == SCR_BT) scan_kick();
+    was_found = found;
     static int missing;
     if(!found){
         if(++missing == 3){

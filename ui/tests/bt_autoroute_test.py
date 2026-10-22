@@ -34,6 +34,9 @@ int ui_route_bt(const char *mac){ routes++; snprintf(route, sizeof route, "%s", 
 void ui_route_forget(const char *why){ (void)why; forgets++; route[0] = 0; }
 void ui_bt_codec_upgrade_cancel(void){ cancels++; }
 static void bt_remember_last(const char *mac){ (void)mac; }
+enum { SCR_BT = 7 }; static int cur_screen, kicks;
+static int screen_current(void){ return cur_screen; }
+static void scan_kick(void){ kicks++; }
 ''' + fn("static int run_cap_bounded(") + "\n" + fn("static int bt_mac_valid(") + "\n" + fn("static void bt_autoroute_poll_cb(") + r'''
 static void poll(int m, int n){ mode = m; for(int i = 0; i < n; i++){ bt_autoroute_poll_cb(NULL); now += 3000; } }
 int main(void){
@@ -46,6 +49,13 @@ int main(void){
     poll(0, 3); assert(forgets == 1 && cancels == 1);                 /* really gone: forgotten after three */
     poll(1, 1); assert(routes == 2);                                  /* back: full route again */
     puts("PASS a real disconnect (three completed empty probes) is forgotten and the headphones are routed afresh");
+    /* 2.6.2: the Bluetooth screen refreshes when the headphones' link comes or goes while it's open */
+    cur_screen = SCR_BT; kicks = 0; poll(1, 3); poll(0, 1); assert(kicks == 1);   /* switched off: refreshed once */
+    poll(0, 2); assert(kicks == 1);                                               /* no repeats while still off */
+    poll(-1, 2); assert(kicks == 1);                                              /* slow answers: nothing */
+    poll(1, 2); assert(kicks == 2);                                               /* back on: refreshed once */
+    cur_screen = 0; poll(0, 1); poll(1, 1); assert(kicks == 2);                   /* screen closed: nothing */
+    puts("PASS the Bluetooth screen refreshes once when headphones connect or disconnect while it's open");
     return 0;
 }
 '''
