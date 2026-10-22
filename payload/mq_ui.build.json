@@ -1,16 +1,16 @@
 {
   "version": "2.7.0",
-  "revision": "Disco 2.7.0: native Disc Shelf Navidrome/SMB3, scoped copy Wi-Fi power-save guard, app previews, download speed and Shuffle!",
+  "revision": "Disco 2.7.0: clean Artist/YYYY - Album/NN. Title filenames, native Disc Shelf, scoped copy PM guard, app guards and Shuffle!",
   "baseline": "v2.6.2",
-  "source_commit": "ac1e1ce336f779cf35977243539e0d272713d57c",
-  "ui_source_sha256": "58ef14e270473f116d6813dc1ea6f317c1a13003f40b78399b81611c3c8a0e0e",
+  "source_commit": "cc6d29241618351970b6fc9431798c815c1cb69d",
+  "ui_source_sha256": "125b6c0f86802e8b3544ece94650ff00e5e74609e961ba5d581de5fbc7cf3631",
   "ui_source_hash_recipe": "sorted tracked ui paths: path + NUL + file bytes + NUL",
   "compiler": "Repository prebuilt toolchain-gcc11.2: GCC 11.2.0, musl 1.2.6",
   "abi": "static little-endian MIPS32r2, o32, FP64, NaN2008",
-  "status": "2.7.0 stable-channel release package. Host PM policy/error/timeout, Navidrome/SQLite, SMB3 wire, lifecycle and LVGL tests passed. Real-driver PM restore, independent NAS compatibility and power/peak memory remain device-validation items. No Bluetooth changes.",
+  "status": "2.7.0 stable-channel release package. Naming/collision/legacy-path/cover-placement, Navidrome/SQLite, SMB3 wire, PM policy and LVGL tests passed. Physical PM restore, independent NAS compatibility and power/peak memory remain device-validation items.",
   "binary": {
-    "sha256": "54687764b1280a9a53a4661059277a32a0d6494addafc4870c0871bdad76af36",
-    "md5": "de0f40c3ac55d6e6be4fda0bddc5f07e",
+    "sha256": "1a7e84dd9db1401129e4ff401e997bd507f418750260fc32a0d311659fe0882d",
+    "md5": "432bd6dea238c48120c5bc846dfcb88a",
     "bytes": 6377756
   },
   "artwork_helper": {
