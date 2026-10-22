@@ -1,17 +1,17 @@
 {
-  "version": "2.6.2",
-  "revision": "Disc Shelf and SongSphere development test: static themed guards, Navidrome/SMB3 wording, batched SD writes and download speed",
+  "version": "2.7.0",
+  "revision": "Disco 2.7.0: native Disc Shelf Navidrome/SMB3, themed app guards, buffered downloads and Shuffle! menu action",
   "baseline": "v2.6.2",
-  "source_commit": "923743d87994914b9bb9fe423e27a81882e69c18",
-  "ui_source_sha256": "75cd1d944d58bc8d6d19fd0fca6a8114bd21356e31f8215049beafdd4470c314",
+  "source_commit": "c469ee6af35a189480215227c68a8caa2f303b4a",
+  "ui_source_sha256": "fda37288ce04658d63fe7ec722720adf328f50342e74230c5b328c9c30bcb543",
   "ui_source_hash_recipe": "sorted tracked ui paths: path + NUL + file bytes + NUL",
   "compiler": "Repository prebuilt toolchain-gcc11.2: GCC 11.2.0, musl 1.2.6",
   "abi": "static little-endian MIPS32r2, o32, FP64, NaN2008",
-  "status": "DEVELOPMENT TEST BUILD. HTTP/SQLite regressions, buffered-transfer fault tests and three-theme LVGL/guard tests passed. On-device speed improvement is unmeasured. No release tag or Bluetooth changes.",
+  "status": "2.7.0 release build. Native lifecycle, credentials, encrypted SMB3 wire fixture, Navidrome/SQLite, transfer-fault and themed LVGL tests passed. Navidrome used on owner Disc; physical SMB3 NAS interoperability, current draw and peak RSS remain unverified. No Bluetooth changes.",
   "binary": {
-    "sha256": "c65c8e4b3b0e0cba13635a75c4f4025105e9584e9de95b8ea78f51962bf79084",
-    "md5": "5fca276dcb03ac4ef4d0fba8bc9409a5",
-    "bytes": 6373632
+    "sha256": "86fb86725539dc9ed4a8e04b7fdf346603dd576212e24d446801864cfc03c10f",
+    "md5": "59ab2c566003adf50f9d1e1122913a2d",
+    "bytes": 6374132
   },
   "artwork_helper": {
     "bytes": 119424,
@@ -22,5 +22,6 @@
     "tag": "libsmb2-6.3",
     "commit": "2bcb014b23a8c8cccf534eea8bda2fe5df453cfd",
     "license": "LGPL-2.1-or-later"
-  }
+  },
+  "baseline_commit": "e8b3b3a1cf47a5e9b2fd46639c3bacd249d82213"
 }
