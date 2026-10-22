@@ -98,7 +98,7 @@ lv_obj_t *app_guard_create(lv_obj_t *parent,lv_event_cb_t launch,int kind){
  lv_obj_t *l=txt(group,sphere?"SongSphere":"Disc Shelf",40,128,280,TF(UI_32));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);
  l=txt(group,sphere?"Find your mood.":"Your music, to go.",44,180,272,TF(UI_18));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_set_style_text_color(l,TC(ACCENT_PRIMARY),0);
  l=txt(group,sphere?"Place songs. Play a feeling.":"Navidrome or SMB3.",44,214,272,TF(UI_16));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_set_style_text_color(l,TC(TEXT_SECONDARY),0);
- lv_obj_t *b=pill(group,sphere?"Open SongSphere":"Open Disc Shelf",70,260,220,52,TF(UI_22));
+ lv_obj_t *b=pill(group,sphere?"Open SongSphere":"Open Disc Shelf",70,260,220,52,TF(UI_20));
  /* Preserve the measured face when the shared theme pass visits the guard. */
  kit_keep(lv_obj_get_child(b,0));
  lv_obj_set_style_border_width(b,2,0);lv_obj_add_event_cb(b,launch,LV_EVENT_CLICKED,NULL);

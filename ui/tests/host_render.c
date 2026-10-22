@@ -796,6 +796,12 @@ int main(int argc, char **argv){
         assert(!find_visible_text(screen_get_root(SCR_APPLAND),"Open Disc Shelf"));
         assert(find_visible_text(screen_get_root(SCR_APPLAND),"Open SongSphere"));
         app_launch(APP_BUILTIN_SPHERE);nav_wait(20);assert(screen_current()==SCR_APPLAND && !guard_db_opens);
+        {
+            lv_obj_t *l=find_visible_text(screen_get_root(SCR_APPLAND),"Open SongSphere");
+            lv_point_t sz;lv_text_get_size(&sz,lv_label_get_text(l),lv_obj_get_style_text_font(l,0),lv_obj_get_style_text_letter_space(l,0),0,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+            assert(sz.x<=lv_obj_get_width(l));
+            assert(lv_obj_get_height(l)<=lv_font_get_line_height(lv_obj_get_style_text_font(l,0)));
+        }
         if(getenv("REVIEW_GUARD")){
             lv_obj_t *label=find_visible_text(screen_get_root(SCR_APPLAND),"Open SongSphere");
             lv_obj_send_event(lv_obj_get_parent(label),LV_EVENT_CLICKED,NULL);
