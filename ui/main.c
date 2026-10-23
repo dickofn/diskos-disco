@@ -3885,7 +3885,7 @@ int main(int argc, char **argv){
         int sstyle    = simple_cfg_get_int("saver_style", 0);
         int art_saver = (sstyle == 0 || sstyle == 4);
         int saver_ok  = (!art_saver || playing);
-        if(saver_timeout > 0 || manual){
+        if(saver_timeout > 0 || screenoff_extra > 0 || manual){
             /* manual sleep runs its dim/off countdown from the tile tap, independent of the
              * (possibly disabled) auto-saver timer */
             uint32_t idle = manual ? lv_tick_elaps(g_manual_sleep_at) : lv_tick_elaps(last_activity);
@@ -3910,10 +3910,12 @@ int main(int argc, char **argv){
                 ui_backlight(dim); bl_state = 1;
             }
             /* full off after the screen-off delay. Manual sleep uses the configured Screen Off
-             * delay when set, else a 10s default so the tile actually powers the panel down. */
+             * delay when set, else a 10s default so the tile actually powers the panel down.
+             * Screensaver Off: nothing dims first, so Screen Off counts from the last input and the
+             * lit screen goes straight off (off_at is then just the Screen Off delay). */
             uint32_t off_at = manual ? (uint32_t)(screenoff_extra > 0 ? screenoff_extra : 10)*1000
                                      : (uint32_t)(saver_timeout+screenoff_extra)*1000;
-            if(bl_state==1 && (manual || screenoff_extra > 0) && idle > off_at){
+            if((bl_state==1 || (bl_state==0 && !saver_timeout && !manual)) && (manual || screenoff_extra > 0) && idle > off_at){
                 ui_backlight(0); bl_state = 2;
                 /* screen fully off -> STOP the screensaver. Leaving SCR_SAVER: (a) satisfies "the
                  * saver stops when the screen turns off"; (b) pops back to the screen shown BEFORE
