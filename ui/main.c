@@ -82,6 +82,22 @@ static void screen_hw_lock(int lock){
     }
 }
 
+/* Interrupts counted for the power key, all CPUs (2 per click), or -1 if /proc/interrupts can't be read. */
+static long power_key_irqs(void){
+    FILE *f = fopen("/proc/interrupts", "re");
+    if(!f) return -1;
+    char line[256]; long n = -1;
+    while(fgets(line, sizeof line, f)){
+        char *p = strchr(line, ':');
+        if(!p || !strstr(line, "power_up_key_irq")) continue;
+        n = 0; p++;
+        for(;;){ char *e; long v = strtol(p, &e, 10); if(e == p) break; n += v; p = e; }   /* one count per CPU */
+        break;
+    }
+    fclose(f);
+    return n;
+}
+
 /* Manual "Sleep" (Quick Settings tile): a deliberate screen-off request. It must dim+power
  * the panel even when the auto-screensaver is Off, so it can't ride the saver_timeout>0 path.
  * g_manual_sleep is armed by ui_request_sleep(); the saver block below honours it and clears
@@ -3830,6 +3846,7 @@ int main(int argc, char **argv){
             static volatile uint32_t *gpe; static int gpe_tried; static uint32_t last_pkpoll;
             static int pk_down, pk_shown, pk_seen_up; static uint32_t pk_since, pk_rel;   /* pk_seen_up: ignore a key still held from power-on */
             static int pk_lit, pk_apply;   /* #18: was the screen lit at the press; a short press waits to be applied */
+            static long pk_irqs = -1;      /* #18: power-key interrupts counted at the last press seen */
             if(lv_tick_elaps(last_pkpoll) >= 50){
                 last_pkpoll = lv_tick_get();
                 if(!gpe && !gpe_tried){
@@ -3840,15 +3857,22 @@ int main(int argc, char **argv){
                 }
                 int d = gpe ? (((*gpe >> 31) & 1u) == 0) : 0;
                 if(!d) pk_seen_up = 1;
+                long irqs = gpe ? power_key_irqs() : -1;
+                if(pk_irqs < 0) pk_irqs = irqs;
                 if(d && !pk_down && pk_seen_up){ pk_down = 1; pk_since = lv_tick_get(); pk_lit = bl_state == 0; }
-                else if(!d && pk_down){ pk_down = 0; pk_rel = lv_tick_get(); pk_apply = !pk_shown; }
+                else if(!d && pk_down){ pk_down = 0; pk_rel = lv_tick_get(); pk_apply = !pk_shown; pk_irqs = irqs; }
+                else if(!d && pk_seen_up && irqs >= 0 && irqs - pk_irqs >= 2){
+                    /* #18: a whole click between two polls (the loop sleeps 200 ms while the screen is off, a click lasts
+                     * ~150 ms): the pin never read low, but the kernel counted both edges. */
+                    pk_lit = bl_state == 0; pk_rel = lv_tick_get(); pk_apply = 1; pk_irqs = irqs;
+                }
                 int hold = simple_cfg_get_int("pwr_hold_ms", 5000); if(hold < 300) hold = 300;
                 /* #18: a short press locks a lit screen and wakes a dimmed or dark one, whatever the player believes. The
                  * player only knows its own presses, so after diskOS's sleep or a tap wake it toggles the wrong way. It
                  * acts on the release (device-measured: 30 ms after it, done ~130 ms later), so diskOS sets the state
                  * the user meant 250 ms after the release, over whatever the player just did. A player slower than that
-                 * would undo it, so at 700 ms: a lock is sent again (invisible on a dark screen), and a wake is redone
-                 * only if the player has blanked the screen since (brightness 0), so a normal wake never flickers. */
+                 * would undo it, so at 700 ms both are sent again: a lock is invisible on a dark screen, and a repeated
+                 * panel-on shows nothing (checked on the Disc); the backlight is only redone if the player blanked it. */
                 if(pk_apply == 1 && !pk_down && lv_tick_elaps(pk_rel) >= 250){
                     pk_apply = 2;
                     if(pk_lit){
@@ -3862,9 +3886,11 @@ int main(int argc, char **argv){
                 } else if(pk_apply == 2 && !pk_down && lv_tick_elaps(pk_rel) >= 700){
                     pk_apply = 0;
                     if(pk_lit){ if(hw_locked) screen_hw_lock(1); }
-                    else if(read_int_file("/sys/class/backlight/backlight/brightness") == 0){
+                    else {
                         screen_hw_lock(0); hw_locked = 0;
-                        ui_backlight(ui_effective_brightness()); bl_state = 0; player_blanked = 0;
+                        if(bl_state != 0 || read_int_file("/sys/class/backlight/backlight/brightness") == 0){
+                            ui_backlight(ui_effective_brightness()); bl_state = 0; player_blanked = 0;
+                        }
                     }
                 }
                 if(pk_down && !pk_shown && lv_tick_elaps(pk_since) >= (uint32_t)hold){
