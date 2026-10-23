@@ -66,6 +66,22 @@ static int         g_touch_raw = -1;   /* a 2nd, RAW read-only fd on the touch e
                                           final RELEASED (no press edge -> no wake), so we watch the
                                           raw stream where ANY event means "a finger touched". */
 
+/* Issue #18: the player's own power-button lock, seen in an strace of mq_player (V2.57): it puts the touch chip
+ * to sleep (cst816t nr 3, wake nr 4) and turns the panel off (st77916 nr 1, on nr 2), each _IOC(_IOC_NONE, 0xef,
+ * nr, 0) with argument 2. diskOS uses the same calls so its own sleep can be a real lock: no touch, panel off. */
+static void screen_hw_lock(int lock){
+    static const struct { const char *dev; unsigned nr_lock, nr_unlock; } hw[] = {
+        { "/dev/cst816t", 3, 4 }, { "/dev/lcd_st77916", 1, 2 } };
+    for(int k = 0; k < 2; k++){
+        int i = lock ? k : 1 - k;                      /* lock: touch, then panel; unlock: panel, then touch (as the player) */
+        int fd = open(hw[i].dev, O_RDWR | O_CLOEXEC);
+        if(fd < 0){ fprintf(stderr, "screen lock: open %s: %s\n", hw[i].dev, strerror(errno)); continue; }
+        if(ioctl(fd, _IOC(_IOC_NONE, 0xef, lock ? hw[i].nr_lock : hw[i].nr_unlock, 0), 2) < 0)
+            fprintf(stderr, "screen lock: %s: %s\n", hw[i].dev, strerror(errno));
+        close(fd);
+    }
+}
+
 /* Manual "Sleep" (Quick Settings tile): a deliberate screen-off request. It must dim+power
  * the panel even when the auto-screensaver is Off, so it can't ride the saver_timeout>0 path.
  * g_manual_sleep is armed by ui_request_sleep(); the saver block below honours it and clears
@@ -3358,6 +3374,7 @@ int main(int argc, char **argv){
     uint32_t touch_gate_wake = 0;   /* a waking touch still down: keep it off until the lift (tick | 1, 0 = none) */
     uint32_t last_blpoll = 0;   /* PW-10 backlight-rail poll cadence */
     int player_blanked = 0;     /* PW-10: we forced bl_power=4 because the player blanked via brightness=0 */
+    int hw_locked = 0;          /* #18: diskOS put the touch chip to sleep and the panel off (screen_hw_lock) */
     unsigned last_vol_seq = 0;
     /* Start the boot splash HERE - after all the blocking startup init (hwclock, bt_boot_restore,
      * IPC connect, etc.). Created earlier, its time-based animation would elapse during that
@@ -3812,6 +3829,7 @@ int main(int argc, char **argv){
              * alarm, the screen goes away. Hold time: cfg "pwr_hold_ms" (default 5000, the player's own 5 s hold). */
             static volatile uint32_t *gpe; static int gpe_tried; static uint32_t last_pkpoll;
             static int pk_down, pk_shown, pk_seen_up; static uint32_t pk_since, pk_rel;   /* pk_seen_up: ignore a key still held from power-on */
+            static int pk_lit, pk_apply;   /* #18: was the screen lit at the press; a short press waits to be applied */
             if(lv_tick_elaps(last_pkpoll) >= 50){
                 last_pkpoll = lv_tick_get();
                 if(!gpe && !gpe_tried){
@@ -3822,11 +3840,36 @@ int main(int argc, char **argv){
                 }
                 int d = gpe ? (((*gpe >> 31) & 1u) == 0) : 0;
                 if(!d) pk_seen_up = 1;
-                if(d && !pk_down && pk_seen_up){ pk_down = 1; pk_since = lv_tick_get(); }
-                else if(!d && pk_down){ pk_down = 0; pk_rel = lv_tick_get(); }
+                if(d && !pk_down && pk_seen_up){ pk_down = 1; pk_since = lv_tick_get(); pk_lit = bl_state == 0; }
+                else if(!d && pk_down){ pk_down = 0; pk_rel = lv_tick_get(); pk_apply = !pk_shown; }
                 int hold = simple_cfg_get_int("pwr_hold_ms", 5000); if(hold < 300) hold = 300;
+                /* #18: a short press locks a lit screen and wakes a dimmed or dark one, whatever the player believes. The
+                 * player only knows its own presses, so after diskOS's sleep or a tap wake it toggles the wrong way. It
+                 * acts on the release (device-measured: 30 ms after it, done ~130 ms later), so diskOS sets the state
+                 * the user meant 250 ms after the release, over whatever the player just did. A player slower than that
+                 * would undo it, so at 700 ms: a lock is sent again (invisible on a dark screen), and a wake is redone
+                 * only if the player has blanked the screen since (brightness 0), so a normal wake never flickers. */
+                if(pk_apply == 1 && !pk_down && lv_tick_elaps(pk_rel) >= 250){
+                    pk_apply = 2;
+                    if(pk_lit){
+                        ui_backlight(0); screen_hw_lock(1); hw_locked = 1; bl_state = 2;
+                    } else {
+                        screen_hw_lock(0); hw_locked = 0;
+                        ui_backlight(ui_effective_brightness()); bl_state = 0; last_activity = lv_tick_get();
+                    }
+                    player_blanked = 0;
+                    if(screen_current() == SCR_SAVER) screen_back();
+                } else if(pk_apply == 2 && !pk_down && lv_tick_elaps(pk_rel) >= 700){
+                    pk_apply = 0;
+                    if(pk_lit){ if(hw_locked) screen_hw_lock(1); }
+                    else if(read_int_file("/sys/class/backlight/backlight/brightness") == 0){
+                        screen_hw_lock(0); hw_locked = 0;
+                        ui_backlight(ui_effective_brightness()); bl_state = 0; player_blanked = 0;
+                    }
+                }
                 if(pk_down && !pk_shown && lv_tick_elaps(pk_since) >= (uint32_t)hold){
                     pk_shown = 1;
+                    if(hw_locked){ screen_hw_lock(0); hw_locked = 0; }
                     if(bl_state){ ui_backlight(ui_effective_brightness()); bl_state = 0; player_blanked = 0; }   /* lit, so it can be seen */
                     last_activity = lv_tick_get();
                     ui_shutdown_screen();
@@ -3915,6 +3958,8 @@ int main(int argc, char **argv){
                                      : (uint32_t)(saver_timeout+screenoff_extra)*1000;
             if(bl_state==1 && (manual || screenoff_extra > 0) && idle > off_at){
                 ui_backlight(0); bl_state = 2;
+                /* #18 Tap to Wake Off: lock like the power button (touch asleep, panel off), so only the button wakes */
+                if(!simple_cfg_get_int("tap_wake", 1)){ screen_hw_lock(1); hw_locked = 1; }
                 /* screen fully off -> STOP the screensaver. Leaving SCR_SAVER: (a) satisfies "the
                  * saver stops when the screen turns off"; (b) pops back to the screen shown BEFORE
                  * the saver, so a later wake lands there, not on the saver; (c) makes saver_anim_cb
@@ -3944,6 +3989,7 @@ int main(int argc, char **argv){
                 lv_indev_enable(g_touch, !want_off);
             }
         }
+        if(hw_locked && bl_state != 2){ screen_hw_lock(0); hw_locked = 0; }   /* #18: any other wake path unlocks too */
         polls_set_paused(bl_state == 2);
         int was_screen_off=g_screen_off;
         g_screen_off = (bl_state == 2);

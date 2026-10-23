@@ -858,6 +858,8 @@ static const setting_t TABLE[] = {
       "Choose Cover, Analog, Minimal, Digital, Vinyl or Ring screensaver.", NULL },
     { "Standby",  "Screen Off",  ST_CYCLER, "screenoff_idx", 0,0,0, OPT_POWER, 5, NULL, NULL, 3,
       "How long after the screensaver the screen turns fully off.", NULL },
+    { "Standby",  "Tap to Wake", ST_TOGGLE, "tap_wake", 0,1,1, NULL, 0, NULL, NULL, 1,
+      "Off: a screen that turns off by itself locks like the power button, so only the button wakes it.", NULL },
     { "Online & Extras",  "Online Album Art", ST_TOGGLE, "online_art", 0,1,1, NULL, 0, NULL, apply_online_art, 0,
       "Fetch missing covers over Wi-Fi, once per album. Playback is unaffected.", NULL },
     { "Online & Extras",  "Online Lyrics", ST_TOGGLE, "online_lyrics", 0,1,1, NULL, 0, NULL, NULL, 1,
